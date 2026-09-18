@@ -1,4 +1,4 @@
-import React from "react";
+// import React from "react";
 import { PageHeader, Badge } from "../components/ui.jsx";
 import DataTable from "../components/DataTable.jsx";
 import { applicationsList } from "../data/mockData.js";

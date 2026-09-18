@@ -1,9 +1,6 @@
-import React from "react";
+// import React from "react";
 import { X } from "lucide-react";
 
-/* ---------------------------------------------------------------------- */
-/* PageHeader — every page opens with this: eyebrow, title, optional CTA  */
-/* ---------------------------------------------------------------------- */
 export function PageHeader({ eyebrow, title, description, action }) {
   return (
     <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-8">
@@ -27,9 +24,6 @@ export function PageHeader({ eyebrow, title, description, action }) {
   );
 }
 
-/* ---------------------------------------------------------------------- */
-/* Badge — status pill. Color derives from a status→tone map.             */
-/* ---------------------------------------------------------------------- */
 const TONE_MAP = {
   // greens
   active: "good",
