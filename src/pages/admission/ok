@@ -1,0 +1,1757 @@
+import { register } from "../../lib/api"
+import { useState, useEffect } from "react"
+import { useNavigate, useParams } from "react-router-dom"
+import {
+    ChevronLeft, ChevronRight, Building2, GraduationCap, Clock, Layers, Award,
+    CheckCircle2, FileText, Eye, EyeOff, Sparkles, Copy, Check, KeyRound,
+    UserPlus, LogIn, UserCheck, UserPlus2,
+} from "lucide-react"
+import logo from "../../assets/edunova-logo.webp"
+import { useApplication } from "./ApplicationContext"
+import { trackConfigs } from "./trackconfig"
+import type { Track } from "./trackconfig"
+
+type Step =
+    | "entry" | "login" | "faculty" | "department" | "programme" | "requirements"
+    | "applicantType" | "eduNovaLookup" | "account" | "created" | "dashboard"
+
+const flowOrder: Step[] = ["entry", "faculty", "department", "programme", "requirements", "applicantType", "account", "created"]
+const [isSubmitting, setIsSubmitting] = useState(false)
+const [accountError, setAccountError] = useState("")
+function BackButton({ onClick, label = "Back" }: { onClick: () => void; label?: string }) {
+    return (
+        <button onClick={onClick} className="flex items-center gap-1.5 text-sm text-black/50 hover:text-[#1E3A8A] transition-colors w-fit">
+            <ChevronLeft size={16} /> {label}
+        </button>
+    )
+}
+
+function Breadcrumb({ items }: { items: string[] }) {
+    return (
+        <p className="text-xs text-black/40">
+            {items.map((item, i) => (
+                <span key={i}>
+                    {i > 0 && <span className="mx-1.5">/</span>}
+                    <span className={i === items.length - 1 ? "text-[#1E3A8A] font-medium" : ""}>{item}</span>
+                </span>
+            ))}
+        </p>
+    )
+}
+
+export default function AdmissionFlow() {
+    const { track: trackParam } = useParams<{ track: string }>()
+    const track = (trackParam ?? "undergraduate") as Track
+    const config = trackConfigs[track]
+
+    const navigate = useNavigate()
+    const { data, setTrack, setSelection, setApplicantType, prefillFromEduNovaRecord, setAccountCreated, progressPercent } = useApplication()
+
+    const [step, setStep] = useState<Step>("entry")
+    const [faculty, setFaculty] = useState("")
+    const [department, setDepartment] = useState("")
+    const [showPassword, setShowPassword] = useState(false)
+    const [copied, setCopied] = useState(false)
+    const [studentIdInput, setStudentIdInput] = useState("")
+    const [lookupError, setLookupError] = useState("")
+
+    const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", password: "", confirmPassword: "" })
+    const [loginForm, setLoginForm] = useState({ idOrEmail: "", password: "" })
+    const [loginError, setLoginError] = useState("")
+
+    const programme = department ? config.programmesByDept[department] ?? null : null
+
+    // Ensure track/applicationNumber are registered in context as soon as this mounts
+    // Ensure track/applicationNumber are registered in context as soon as this mounts
+    useEffect(() => {
+    if (data.track !== track) setTrack(track)
+    }, [track, data.track, setTrack])
+
+    const goBack = () => {
+        const idx = flowOrder.indexOf(step)
+        if (idx > 0) {
+            let prevStep = flowOrder[idx - 1]
+            if (prevStep === "requirements" && !config.hasApplicantTypeStep) {
+                // requirements always shown for non-PG tracks; fine as-is
+            }
+            setStep(prevStep)
+        } else {
+            setStep("entry")
+        }
+    }
+
+    const canCreateAccount = form.firstName && form.lastName && form.email && form.phone && form.password.length >= 6 && form.password === form.confirmPassword
+
+    const copyAppNumber = () => {
+        navigator.clipboard.writeText(data.applicationNumber)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
+
+    const afterProgrammeContinue = () => {
+        setSelection(faculty, department, programme?.title ?? "")
+        setStep(config.hasApplicantTypeStep ? "applicantType" : "requirements")
+    }
+
+    const handleEduNovaLookup = () => {
+        if (!studentIdInput.trim()) { setLookupError("Enter your EduNova Student ID to continue."); return }
+        setLookupError("")
+        prefillFromEduNovaRecord(studentIdInput.trim())
+        setStep("created")
+    }
+
+    const handleLogin = () => {
+        if (!loginForm.idOrEmail.trim() || !loginForm.password.trim()) {
+            setLoginError("Enter your application number/email and password to continue.")
+            return
+        }
+        setLoginError("")
+        setStep("dashboard")
+    }
+
+    const handleCreateAccount = () => {
+        setSelection(faculty, department, programme?.title ?? "")
+        setAccountCreated(`${form.firstName} ${form.lastName}`.trim(), form.email)
+        setStep("created")
+    }
+
+    return (
+        <div className="min-h-screen bg-[#F6F6F2]">
+            {step !== "dashboard" && (
+                <div className="relative bg-gradient-to-br from-[#0B1524] via-[#14263F] to-[#1E3A8A] overflow-hidden">
+                    <div className="absolute -top-24 -right-24 w-72 h-72 bg-[#B8901F]/20 rounded-full blur-3xl" />
+                    <div className="relative px-4 md:px-8 py-10 max-w-2xl mx-auto text-center flex flex-col items-center">
+                        <img src={logo} alt="EduNova" className="h-9 w-auto mb-5 opacity-90" />
+                        <span className="inline-flex items-center gap-1.5 font-mono text-xs tracking-[0.2em] uppercase text-[#B8901F] mb-3">
+                            <Sparkles size={13} /> {config.heroLabel}
+                        </span>
+                        <h1 className="font-serif text-white text-2xl md:text-3xl font-semibold leading-snug">
+                            {step === "entry" && "Let's get started"}
+                            {step === "login" && "Welcome back"}
+                            {step === "faculty" && "Select the faculty offering your intended programme."}
+                            {step === "department" && "Select your department."}
+                            {step === "programme" && `Available ${config.label} Programmes`}
+                            {step === "requirements" && programme?.title}
+                            {step === "applicantType" && "Tell us about your background"}
+                            {step === "eduNovaLookup" && "Welcome back, EduNova graduate"}
+                            {(step === "account" || step === "created") && "Create Your Application Account"}
+                        </h1>
+                    </div>
+                </div>
+            )}
+
+            <div className="px-4 md:px-8 py-8 max-w-2xl mx-auto flex flex-col gap-5">
+
+                {/* Entry */}
+                {step === "entry" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                        <button onClick={() => setStep("faculty")} className="group flex flex-col items-start gap-3 bg-white rounded-2xl border border-black/5 p-6 text-left hover:border-[#1E3A8A]/30 hover:shadow-md transition-all duration-300">
+                            <div className="w-12 h-12 rounded-xl bg-[#1E3A8A]/8 flex items-center justify-center">
+                                <UserPlus size={22} strokeWidth={1.5} className="text-[#1E3A8A]" />
+                            </div>
+                            <div>
+                                <p className="font-serif font-semibold text-black">Start New Application</p>
+                                <p className="text-xs text-black/50 mt-1">Choose your programme and create an application account.</p>
+                            </div>
+                        </button>
+                        <button onClick={() => setStep("login")} className="group flex flex-col items-start gap-3 bg-white rounded-2xl border border-black/5 p-6 text-left hover:border-[#B8901F]/40 hover:shadow-md transition-all duration-300">
+                            <div className="w-12 h-12 rounded-xl bg-[#B8901F]/10 flex items-center justify-center">
+                                <LogIn size={22} strokeWidth={1.5} className="text-[#B8901F]" />
+                            </div>
+                            <div>
+                                <p className="font-serif font-semibold text-black">Continue Application</p>
+                                <p className="text-xs text-black/50 mt-1">Log in to pick up where you left off.</p>
+                            </div>
+                        </button>
+                    </div>
+                )}
+
+                {/* Login */}
+                {step === "login" && (
+                    <>
+                        <BackButton onClick={() => setStep("entry")} />
+                        <div className="bg-white rounded-2xl border border-black/5 p-7 flex flex-col gap-4">
+                            <div className="flex flex-col gap-2">
+                                <label className="font-mono text-xs tracking-wide uppercase text-black/50">Application Number or Email</label>
+                                <input value={loginForm.idOrEmail} onChange={(e) => setLoginForm({ ...loginForm, idOrEmail: e.target.value })} className="border border-black/15 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#1E3A8A] transition-colors" />
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <label className="font-mono text-xs tracking-wide uppercase text-black/50">Password</label>
+                                <div className="relative">
+                                    <input type={showPassword ? "text" : "password"} value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} className="w-full border border-black/15 rounded-lg px-4 py-3 pr-10 text-sm focus:outline-none focus:border-[#1E3A8A] transition-colors" />
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-black/30 hover:text-black/60">
+                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+                            {loginError && <p className="text-xs text-red-500">{loginError}</p>}
+                            <button onClick={handleLogin} className="flex items-center justify-center gap-2 bg-gradient-to-r from-[#14263F] to-[#1E3A8A] text-white text-sm font-semibold py-3.5 rounded-xl hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 mt-1">
+                                <KeyRound size={16} /> Continue Application
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {/* Faculty */}
+                {step === "faculty" && (
+                    <>
+                        <BackButton onClick={goBack} label="Back to start" />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {config.faculties.map((f, i) => (
+                                <button key={i} onClick={() => { setFaculty(f); setStep("department") }} className="group flex items-center gap-4 bg-white rounded-2xl border border-black/5 p-5 text-left hover:border-[#1E3A8A]/30 hover:shadow-md transition-all duration-300">
+                                    <div className="w-11 h-11 rounded-full bg-[#1E3A8A]/8 flex items-center justify-center flex-shrink-0">
+                                        <Building2 size={20} strokeWidth={1.5} className="text-[#1E3A8A]" />
+                                    </div>
+                                    <span className="text-sm font-medium text-black/80 group-hover:text-[#1E3A8A] transition-colors">{f}</span>
+                                    <ChevronRight size={16} className="ml-auto text-black/20 group-hover:text-[#1E3A8A] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                )}
+
+                {/* Department */}
+                {step === "department" && (
+                    <>
+                        <BackButton onClick={goBack} />
+                        <Breadcrumb items={[config.label, faculty]} />
+                        <div className="flex flex-col gap-3">
+                            {(config.departmentsByFaculty[faculty] ?? []).map((d, i) => (
+                                <button key={i} onClick={() => { setDepartment(d); setStep("programme") }} className="group flex items-center justify-between bg-white rounded-xl border border-black/5 px-5 py-4 text-left hover:border-[#1E3A8A]/30 hover:shadow-sm transition-all duration-300">
+                                    <span className="text-sm font-medium text-black/80 group-hover:text-[#1E3A8A] transition-colors">{d}</span>
+                                    <ChevronRight size={16} className="text-black/20 group-hover:text-[#1E3A8A] group-hover:translate-x-0.5 transition-all" />
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                )}
+
+                {/* Programme */}
+                {step === "programme" && programme && (
+                    <>
+                        <BackButton onClick={goBack} />
+                        <Breadcrumb items={[config.label, faculty, department]} />
+                        <div className="bg-white rounded-2xl border border-black/5 p-7">
+                            <div className="flex items-start gap-4 mb-6">
+                                <div className="w-14 h-14 rounded-2xl bg-[#1E3A8A]/8 flex items-center justify-center flex-shrink-0">
+                                    <GraduationCap size={26} strokeWidth={1.5} className="text-[#1E3A8A]" />
+                                </div>
+                                <h3 className="font-serif text-xl font-semibold text-black">{programme.title}</h3>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 pt-5 border-t border-black/5">
+                                <div>
+                                    <Clock size={16} strokeWidth={1.75} className="text-black/30 mb-1.5" />
+                                    <p className="font-mono text-[10px] tracking-wide uppercase text-black/40">Duration</p>
+                                    <p className="text-sm font-medium text-black mt-0.5">{programme.duration}</p>
+                                </div>
+                                <div>
+                                    <Layers size={16} strokeWidth={1.75} className="text-black/30 mb-1.5" />
+                                    <p className="font-mono text-[10px] tracking-wide uppercase text-black/40">Mode</p>
+                                    <p className="text-sm font-medium text-black mt-0.5">{programme.mode}</p>
+                                </div>
+                                <div>
+                                    <Award size={16} strokeWidth={1.75} className="text-black/30 mb-1.5" />
+                                    <p className="font-mono text-[10px] tracking-wide uppercase text-black/40">Qualification</p>
+                                    <p className="text-sm font-medium text-black mt-0.5">{programme.qualification}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button onClick={afterProgrammeContinue} className="self-end bg-[#14263F] text-white text-sm font-semibold px-7 py-3 rounded-xl hover:-translate-y-0.5 hover:shadow-md transition-all duration-300">
+                            Continue
+                        </button>
+                    </>
+                )}
+
+                {/* Requirements (skipped for tracks with an applicant-type step, e.g. postgraduate) */}
+                {step === "requirements" && programme && (
+                    <>
+                        <BackButton onClick={goBack} />
+                        <Breadcrumb items={[config.label, faculty, department, "Requirements"]} />
+                        <div className="bg-white rounded-2xl border border-black/5 p-7 flex flex-col gap-6">
+                            <div>
+                                <p className="font-mono text-xs tracking-widest uppercase text-[#B8901F] mb-3">General Requirements</p>
+                                <div className="flex flex-col gap-2.5">
+                                    {config.generalRequirements.map((r, i) => (
+                                        <div key={i} className="flex items-start gap-2.5">
+                                            <CheckCircle2 size={16} strokeWidth={2} className="text-green-500 mt-0.5 flex-shrink-0" />
+                                            <span className="text-sm text-black/70">{r}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="pt-5 border-t border-black/5">
+                                <p className="font-mono text-xs tracking-widest uppercase text-[#B8901F] mb-3">Application Requirements</p>
+                                <div className="flex flex-col gap-2.5">
+                                    {config.applicationRequirements.map((r, i) => (
+                                        <div key={i} className="flex items-start gap-2.5">
+                                            <FileText size={16} strokeWidth={1.75} className="text-[#1E3A8A] mt-0.5 flex-shrink-0" />
+                                            <span className="text-sm text-black/70">{r}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-gradient-to-br from-[#14263F] to-[#1E3A8A] rounded-2xl p-7 text-center">
+                            <p className="font-serif text-white text-lg font-semibold mb-4">Ready to begin your application?</p>
+                            <button onClick={() => setStep("account")} className="bg-[#B8901F] text-[#14263F] text-sm font-semibold px-7 py-3.5 rounded-xl hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300">
+                                Create Application Account
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {/* Applicant type — postgraduate only */}
+                {step === "applicantType" && (
+                    <>
+                        <BackButton onClick={goBack} />
+                        <p className="text-sm text-black/55 -mt-2">Did you complete your undergraduate degree at EduNova University?</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <button onClick={() => { setApplicantType("eduNovaGraduate"); setStep("eduNovaLookup") }} className="group flex flex-col items-start gap-3 bg-white rounded-2xl border border-black/5 p-6 text-left hover:border-[#1E3A8A]/30 hover:shadow-md transition-all duration-300">
+                                <div className="w-12 h-12 rounded-xl bg-[#1E3A8A]/8 flex items-center justify-center">
+                                    <UserCheck size={22} strokeWidth={1.5} className="text-[#1E3A8A]" />
+                                </div>
+                                <div>
+                                    <p className="font-serif font-semibold text-black">Yes, I'm an EduNova Graduate</p>
+                                    <p className="text-xs text-black/50 mt-1">We'll pull up your academic record to save you time.</p>
+                                </div>
+                            </button>
+                            <button onClick={() => { setApplicantType("external"); setStep("account") }} className="group flex flex-col items-start gap-3 bg-white rounded-2xl border border-black/5 p-6 text-left hover:border-[#B8901F]/40 hover:shadow-md transition-all duration-300">
+                                <div className="w-12 h-12 rounded-xl bg-[#B8901F]/10 flex items-center justify-center">
+                                    <UserPlus2 size={22} strokeWidth={1.5} className="text-[#B8901F]" />
+                                </div>
+                                <div>
+                                    <p className="font-serif font-semibold text-black">No, From Another Institution</p>
+                                    <p className="text-xs text-black/50 mt-1">Create a new applicant account to continue.</p>
+                                </div>
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {/* EduNova graduate lookup */}
+                {step === "eduNovaLookup" && (
+                    <>
+                        <BackButton onClick={() => setStep("applicantType")} />
+                        <div className="bg-white rounded-2xl border border-black/5 p-7 flex flex-col gap-4">
+                            <div className="flex flex-col gap-2">
+                                <label className="font-mono text-xs tracking-wide uppercase text-black/50">EduNova Student ID</label>
+                                <input value={studentIdInput} onChange={(e) => setStudentIdInput(e.target.value)} placeholder="EDU/2026/UG/001245" className="border border-black/15 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#1E3A8A] transition-colors" />
+                            </div>
+                            {lookupError && <p className="text-xs text-red-500">{lookupError}</p>}
+                            <button onClick={handleEduNovaLookup} className="flex items-center justify-center gap-2 bg-gradient-to-r from-[#14263F] to-[#1E3A8A] text-white text-sm font-semibold py-3.5 rounded-xl hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300">
+                                <KeyRound size={16} /> Find My Record
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {/* Create account */}
+                {step === "account" && (
+                    <>
+                        <BackButton onClick={goBack} />
+                        <div className="bg-white rounded-2xl border border-black/5 p-7">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                <input placeholder="First Name" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} className="border border-black/15 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#1E3A8A]" />
+                                <input placeholder="Last Name" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} className="border border-black/15 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#1E3A8A]" />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                <input placeholder="Email Address" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="border border-black/15 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#1E3A8A]" />
+                                <input placeholder="Phone Number" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="border border-black/15 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#1E3A8A]" />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                                <div className="relative">
+                                    <input placeholder="Password" type={showPassword ? "text" : "password"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="w-full border border-black/15 rounded-lg px-4 py-2.5 pr-10 text-sm focus:outline-none focus:border-[#1E3A8A]" />
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-black/30 hover:text-black/60">
+                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                                <input placeholder="Confirm Password" type={showPassword ? "text" : "password"} value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} className="border border-black/15 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#1E3A8A]" />
+                            </div>
+                            <button onClick={handleCreateAccount} disabled={!canCreateAccount} className="w-full bg-gradient-to-r from-[#14263F] to-[#1E3A8A] text-white text-sm font-semibold py-3.5 rounded-xl hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 disabled:opacity-40">
+                                Create Account
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {/* Created / record found */}
+                {step === "created" && (
+                    <div className="bg-white rounded-3xl border border-black/5 p-10 text-center">
+                        <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-5">
+                            <CheckCircle2 size={30} strokeWidth={1.75} className="text-green-600" />
+                        </div>
+                        {data.isEduNovaGraduate ? (
+                            <>
+                                <h2 className="font-serif text-2xl font-semibold text-black mb-2">Record Found</h2>
+                                <p className="text-sm text-black/55 mb-6 max-w-sm mx-auto">
+                                    We've found your EduNova academic record. Some information has been filled in for you — review it before continuing.
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <h2 className="font-serif text-2xl font-semibold text-black mb-2">Account Created</h2>
+                                <p className="text-sm text-black/55 mb-6">Your application number has been generated. Keep it safe.</p>
+                            </>
+                        )}
+                        <div className="flex items-center justify-center gap-2 bg-[#1E3A8A]/5 border border-[#1E3A8A]/10 rounded-xl px-5 py-3 mb-8 w-fit mx-auto">
+                            <span className="font-mono text-sm font-semibold text-[#1E3A8A]">{data.applicationNumber}</span>
+                            <button onClick={copyAppNumber} className="text-[#1E3A8A]/60 hover:text-[#1E3A8A] transition-colors">
+                                {copied ? <Check size={15} /> : <Copy size={15} />}
+                            </button>
+                        </div>
+                        <button onClick={() => setStep("dashboard")} className="bg-[#14263F] text-white text-sm font-semibold px-8 py-3.5 rounded-xl hover:-translate-y-0.5 hover:shadow-md transition-all duration-300">
+                            Go to Applicant Dashboard
+                        </button>
+                    </div>
+                )}
+
+                {/* Dashboard */}
+                {step === "dashboard" && (
+                    <div className="max-w-2xl mx-auto w-full flex flex-col gap-6 pt-8">
+                        <BackButton onClick={() => setStep("entry")} label="Log out" />
+                        <div>
+                            <h1 className="font-serif text-2xl md:text-3xl font-semibold text-black">Welcome, {data.applicantName || "Applicant"} 👋</h1>
+                            <p className="text-sm text-black/55 mt-1">Application Number: <span className="font-mono">{data.applicationNumber}</span></p>
+                        </div>
+                        <div className="bg-white rounded-2xl border border-black/5 p-6">
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="w-12 h-12 rounded-xl bg-[#1E3A8A]/8 flex items-center justify-center flex-shrink-0">
+                                    <GraduationCap size={22} strokeWidth={1.5} className="text-[#1E3A8A]" />
+                                </div>
+                                <div>
+                                    <p className="font-mono text-[10px] tracking-wide uppercase text-black/40">{config.label} Application</p>
+                                    <p className="font-serif font-semibold text-black">{data.programmeTitle || programme?.title}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between mb-2">
+                                <p className="text-sm font-medium text-black">Application Progress</p>
+                                <p className="text-sm font-semibold text-[#B8901F]">{progressPercent(config.educationMode)}%</p>
+                            </div>
+                            <div className="w-full h-2 rounded-full bg-black/5 overflow-hidden mb-4">
+                                <div className="h-full bg-[#B8901F] rounded-full transition-all duration-500" style={{ width: `${progressPercent(config.educationMode)}%` }} />
+                            </div>
+                            <button
+                                onClick={() => navigate(`/admission/apply/${track}/personal-information`)}
+                                className="w-full mt-2 bg-[#14263F] text-white text-sm font-semibold py-3.5 rounded-xl hover:-translate-y-0.5 hover:shadow-md transition-all duration-300"
+                            >
+                                Continue Application
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+
+
+everything above is admission flow programme
+
+next is applicantLayout
+import { Outlet, useLocation, useNavigate, useParams, NavLink } from "react-router-dom"
+import { CheckCircle2, Circle, LogOut } from "lucide-react"
+import logo from "../../assets/edunova-logo.webp"
+import { useApplication } from "./ApplicationContext"
+import { trackConfigs } from "./trackconfig"
+import type { Track } from "./trackconfig"
+
+export default function ApplicantLayout() {
+  const { track: trackParam } = useParams<{ track: string }>()
+  const track = (trackParam ?? "undergraduate") as Track
+  const config = trackConfigs[track]
+  const base = `/admission/apply/${track}`
+
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { data, isPersonalComplete, isEducationComplete, isDocumentsComplete, progressPercent } = useApplication()
+
+  const educationLabel = config.educationMode === "olevel" ? "Academic Information" : "Previous Education"
+
+  const steps = [
+    { label: "Account Created", path: null, done: data.accountCreated },
+    { label: "Programme Selected", path: null, done: !!data.programmeTitle },
+    { label: "Personal Information", path: `${base}/personal-information`, done: isPersonalComplete },
+    { label: educationLabel, path: `${base}/education`, done: isEducationComplete(config.educationMode) },
+    { label: "Documents", path: `${base}/documents`, done: isDocumentsComplete },
+    { label: "Review Application", path: `${base}/review`, done: isPersonalComplete && isEducationComplete(config.educationMode) && isDocumentsComplete },
+    { label: "Application Fee", path: `${base}/fee`, done: data.feePaid },
+    { label: "Submit Application", path: `${base}/submit`, done: data.submitted },
+  ]
+
+  const isUnlocked = (index: number) => steps.slice(0, index).every((s) => s.done)
+  const pct = progressPercent(config.educationMode)
+
+  return (
+    <div className="min-h-screen bg-[#F6F6F2] lg:flex">
+      <aside className="lg:w-80 flex-shrink-0 bg-white border-r border-black/5 lg:h-screen lg:sticky lg:top-0 lg:overflow-y-auto">
+        <div className="px-6 py-6 border-b border-black/5 flex items-center gap-2">
+          <img src={logo} alt="EduNova" className="h-9 w-auto" />
+        </div>
+
+        <div className="px-6 py-6">
+          <p className="font-mono text-[10px] tracking-widest uppercase text-black/40 mb-1">{config.label} Application</p>
+          <p className="font-serif font-semibold text-black leading-snug">{data.programmeTitle || "—"}</p>
+          <p className="font-mono text-xs text-black/40 mt-1">{data.applicationNumber}</p>
+
+          <div className="flex items-center justify-between mt-5 mb-2">
+            <p className="text-xs font-medium text-black/60">Progress</p>
+            <p className="text-xs font-semibold text-[#B8901F]">{pct}%</p>
+          </div>
+          <div className="w-full h-1.5 rounded-full bg-black/5 overflow-hidden">
+            <div className="h-full bg-[#B8901F] rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+
+        <nav className="px-3 pb-6 flex flex-col gap-1">
+          {steps.map((step, i) => {
+            const unlocked = isUnlocked(i)
+            const active = step.path && location.pathname === step.path
+
+            const content = (
+              <>
+                {step.done ? (
+                  <CheckCircle2 size={18} strokeWidth={2} className="text-green-500 flex-shrink-0" />
+                ) : (
+                  <Circle size={18} strokeWidth={1.75} className={`flex-shrink-0 ${unlocked ? "text-[#1E3A8A]/40" : "text-black/15"}`} />
+                )}
+                <span className={`text-sm ${active ? "font-semibold text-[#1E3A8A]" : step.done ? "text-black/70 font-medium" : unlocked ? "text-black/60" : "text-black/30"}`}>
+                  {step.label}
+                </span>
+              </>
+            )
+
+            if (!step.path) {
+              return <div key={i} className="flex items-center gap-3 px-4 py-2.5 rounded-lg">{content}</div>
+            }
+
+            return (
+              <NavLink
+                key={i}
+                to={unlocked ? step.path : "#"}
+                onClick={(e) => { if (!unlocked) e.preventDefault() }}
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${active ? "bg-[#1E3A8A]/5" : unlocked ? "hover:bg-black/[0.03] cursor-pointer" : "cursor-not-allowed"
+                  }`}
+              >
+                {content}
+              </NavLink>
+            )
+          })}
+        </nav>
+
+        <div className="px-6 py-5 border-t border-black/5">
+          <button onClick={() => navigate(`/admission/apply/${track}`)} className="flex items-center gap-2 text-xs text-black/40 hover:text-black/70 transition-colors">
+            <LogOut size={14} /> Save & exit
+          </button>
+        </div>
+      </aside>
+
+      <main className="flex-1 min-w-0">
+        <div className="px-4 md:px-8 py-8 max-w-2xl mx-auto">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  )
+}
+next is appliaction context
+import { createContext, useContext, useState} from "react"
+import type {ReactNode } from "react"
+import type { Track } from "./trackconfig"
+
+export interface PersonalInfo {
+  dob: string
+  gender: string
+  nationality: string
+  state: string
+  lga: string
+  address: string
+  phone: string
+  altPhone: string
+}
+
+export interface Subject { subject: string; grade: string }
+
+// One flexible shape covering both O'Level-style and degree-style education,
+// so a single EducationPage can render the right subset per track.
+export interface EducationInfo {
+  // O'Level mode (undergraduate / certificate / odl)
+  schoolName: string
+  examType: string
+  examNumber: string
+  examYear: string
+  subjects: Subject[]
+  jambNumber: string
+  jambScore: string
+  // Degree mode (postgraduate / international)
+  institution: string
+  degree: string
+  graduationYear: string
+  classOfDegree: string
+  cgpa: string
+  certificate: string
+  transcript: string
+}
+
+export interface Documents {
+  primaryResult: string   // O'Level result OR degree certificate, depending on track
+  passportPhoto: string
+  idDocument: string       // birth certificate / valid ID, depending on track
+  supporting: string       // JAMB slip / referee letter / visa doc, depending on track
+}
+
+export type ApplicantType = "eduNovaGraduate" | "external" | ""
+
+interface ApplicationState {
+  track: Track | null
+  applicantId: string
+  applicationNumber: string
+  faculty: string
+  department: string
+  programmeTitle: string
+  applicantType: ApplicantType
+  isEduNovaGraduate: boolean
+  applicantName: string
+  applicantEmail: string
+  accountCreated: boolean
+  personal: PersonalInfo
+  education: EducationInfo
+  documents: Documents
+  feePaid: boolean
+  submitted: boolean
+}
+
+interface ApplicationContextValue {
+  data: ApplicationState
+  setTrack: (track: Track) => void
+  setSelection: (faculty: string, department: string, programmeTitle: string) => void
+  setApplicantType: (type: ApplicantType) => void
+  prefillFromEduNovaRecord: (studentId: string) => void
+  setAccountCreated: (name: string, email: string) => void
+  setPersonal: (info: PersonalInfo) => void
+  setEducation: (info: EducationInfo) => void
+  setDocuments: (docs: Documents) => void
+  setFeePaid: (paid: boolean) => void
+  setSubmitted: (val: boolean) => void
+  isPersonalComplete: boolean
+  isEducationComplete: (mode: "olevel" | "degree") => boolean
+  isDocumentsComplete: boolean
+  progressPercent: (mode: "olevel" | "degree") => number
+}
+
+const emptyEducation: EducationInfo = {
+  schoolName: "", examType: "", examNumber: "", examYear: "", subjects: [], jambNumber: "", jambScore: "",
+  institution: "", degree: "", graduationYear: "", classOfDegree: "", cgpa: "", certificate: "", transcript: "",
+}
+
+const defaultState: ApplicationState = {
+  track: null,
+  applicantId: "",
+  applicationNumber: "",
+  faculty: "",
+  department: "",
+  programmeTitle: "",
+  applicantType: "",
+  isEduNovaGraduate: false,
+  applicantName: "",
+  applicantEmail: "",
+  accountCreated: false,
+  personal: { dob: "", gender: "", nationality: "", state: "", lga: "", address: "", phone: "", altPhone: "" },
+  education: emptyEducation,
+  documents: { primaryResult: "", passportPhoto: "", idDocument: "", supporting: "" },
+  feePaid: false,
+  submitted: false,
+}
+
+const mockEduNovaRecord = {
+  fullName: "Edwin Adeyi-Samuel",
+  email: "edwin@example.com",
+  previousProgramme: "B.Eng. Mechanical Engineering",
+  graduationYear: "2026",
+  classOfDegree: "Second Class Upper",
+  cgpa: "4.32",
+}
+
+const applicationNumberPrefix: Record<Track, string> = {
+  undergraduate: "EDU-UG", postgraduate: "EDU-PG", certificates: "EDU-PC", odl: "EDU-OD", international: "EDU-IP",
+}
+
+const ApplicationContext = createContext<ApplicationContextValue | undefined>(undefined)
+
+
+export function ApplicationProvider({ children }: { children: ReactNode }) {
+  const [data, setData] = useState<ApplicationState>(defaultState)
+
+  const setTrack = (track: Track) =>
+    setData((prev) => ({
+      ...prev,
+      track,
+      applicationNumber: prev.applicationNumber || `${applicationNumberPrefix[track]}-2026-${Math.floor(Math.random() * 900000 + 100000)}`,
+    }))
+
+  const setSelection = (faculty: string, department: string, programmeTitle: string) =>
+    setData((prev) => ({ ...prev, faculty, department, programmeTitle }))
+
+  const setApplicantType = (type: ApplicantType) =>
+    setData((prev) => ({ ...prev, applicantType: type, isEduNovaGraduate: type === "eduNovaGraduate" }))
+
+  const prefillFromEduNovaRecord = (_studentId: string) =>
+    setData((prev) => ({
+      ...prev,
+      applicantName: mockEduNovaRecord.fullName,
+      applicantEmail: mockEduNovaRecord.email,
+      accountCreated: true,
+      applicantId: prev.applicantId || "EDU-APP-001245",
+      education: {
+        ...prev.education,
+        institution: "EduNova University",
+        degree: mockEduNovaRecord.previousProgramme,
+        graduationYear: mockEduNovaRecord.graduationYear,
+        classOfDegree: mockEduNovaRecord.classOfDegree,
+        cgpa: mockEduNovaRecord.cgpa,
+      },
+    }))
+
+  const setAccountCreated = (name: string, email: string) =>
+    setData((prev) => ({ ...prev, accountCreated: true, applicantId: prev.applicantId || "EDU-APP-001245", applicantName: name, applicantEmail: email }))
+
+  const setPersonal = (info: PersonalInfo) => setData((prev) => ({ ...prev, personal: info }))
+  const setEducation = (info: EducationInfo) => setData((prev) => ({ ...prev, education: info }))
+  const setDocuments = (docs: Documents) => setData((prev) => ({ ...prev, documents: docs }))
+  const setFeePaid = (paid: boolean) => setData((prev) => ({ ...prev, feePaid: paid }))
+  const setSubmitted = (val: boolean) => setData((prev) => ({ ...prev, submitted: val }))
+
+  const isPersonalComplete = !!(data.personal.dob && data.personal.gender && data.personal.state && data.personal.lga && data.personal.address && data.personal.phone)
+
+  const isEducationComplete = (mode: "olevel" | "degree") =>
+    mode === "olevel"
+      ? !!(data.education.schoolName && data.education.examNumber && data.education.subjects.length >= 5)
+      : !!(data.education.institution && data.education.degree && data.education.graduationYear && data.education.cgpa && data.education.transcript)
+
+  const isDocumentsComplete = !!(data.documents.primaryResult && data.documents.passportPhoto && data.documents.idDocument)
+
+  const progressPercent = (mode: "olevel" | "degree") => {
+    const flags = [data.accountCreated, !!data.programmeTitle, isPersonalComplete, isEducationComplete(mode), isDocumentsComplete, data.feePaid, data.submitted]
+    return Math.round((flags.filter(Boolean).length / flags.length) * 100)
+  }
+
+  return (
+    <ApplicationContext.Provider
+      value={{
+        data, setTrack, setSelection, setApplicantType, prefillFromEduNovaRecord, setAccountCreated,
+        setPersonal, setEducation, setDocuments, setFeePaid, setSubmitted,
+        isPersonalComplete, isEducationComplete, isDocumentsComplete, progressPercent,
+      }}
+    >
+      {children}
+    </ApplicationContext.Provider>
+  )
+}
+
+export function useApplication() {
+  const ctx = useContext(ApplicationContext)
+  if (!ctx) throw new Error("useApplication must be used within an ApplicationProvider")
+  return ctx
+}
+next is application fee EducationPage
+import { useState } from "react"
+import { useNavigate, useParams } from "react-router-dom"
+import { ArrowLeft, CreditCard, Building2, Smartphone, CheckCircle2, ArrowRight } from "lucide-react"
+import { useApplication } from "./ApplicationContext"
+import type { Track } from "./trackconfig"
+
+const applicationFeeAmount = 15000
+const naira = (n: number) => `₦${n.toLocaleString()}`
+const paymentMethods = [
+  { label: "Card", icon: CreditCard },
+  { label: "Bank Transfer", icon: Building2 },
+  { label: "USSD", icon: Smartphone },
+]
+
+export default function ApplicationFeePage() {
+  const { track: trackParam } = useParams<{ track: string }>()
+  const track = (trackParam ?? "undergraduate") as Track
+  const base = `/admission/apply/${track}`
+
+  const navigate = useNavigate()
+  const { data, setFeePaid } = useApplication()
+  const [method, setMethod] = useState("Card")
+  const [processing, setProcessing] = useState(false)
+
+  const handlePay = () => {
+    setProcessing(true)
+    setTimeout(() => { setProcessing(false); setFeePaid(true) }, 1400)
+  }
+
+  if (data.feePaid) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <span className="font-mono text-xs tracking-[0.2em] uppercase text-black/40">Application Fee</span>
+          <h1 className="font-serif text-2xl md:text-3xl font-semibold text-black mt-2">Fee Paid</h1>
+        </div>
+        <div className="bg-white rounded-2xl border border-black/5 p-8 text-center">
+          <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 size={26} strokeWidth={1.75} className="text-green-600" />
+          </div>
+          <h3 className="font-serif text-lg font-semibold text-black mb-1">Payment Received</h3>
+          <p className="text-sm text-black/55">Your application fee of {naira(applicationFeeAmount)} has been received.</p>
+        </div>
+        <button onClick={() => navigate(`${base}/submit`)} className="self-end flex items-center gap-2 bg-gradient-to-r from-[#14263F] to-[#1E3A8A] text-white text-sm font-semibold px-7 py-3.5 rounded-xl hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300">
+          Continue <ArrowRight size={16} />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <span className="font-mono text-xs tracking-[0.2em] uppercase text-black/40">Application Fee</span>
+        <h1 className="font-serif text-2xl md:text-3xl font-semibold text-black mt-2">Pay Your Application Fee</h1>
+        <p className="text-sm text-black/55 mt-2">A non-refundable application fee is required to submit your application.</p>
+      </div>
+
+      <div className="rounded-2xl overflow-hidden bg-gradient-to-br from-[#0B1524] to-[#1E3A8A] p-7">
+        <p className="font-mono text-xs tracking-widest uppercase text-[#B8901F] mb-1">Amount Due</p>
+        <p className="font-serif text-white text-4xl font-semibold">{naira(applicationFeeAmount)}</p>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-black/5 p-6">
+        <p className="font-mono text-xs tracking-widest uppercase text-[#B8901F] mb-3">Payment Method</p>
+        <div className="flex flex-col gap-2 mb-6">
+          {paymentMethods.map((m, i) => {
+            const Icon = m.icon
+            const active = method === m.label
+            return (
+              <button key={i} onClick={() => setMethod(m.label)} className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all duration-200 ${active ? "border-[#1E3A8A] bg-[#1E3A8A]/5 text-[#1E3A8A]" : "border-black/10 text-black/60 hover:border-black/20"}`}>
+                <Icon size={18} strokeWidth={1.75} />
+                {m.label}
+                {active && <CheckCircle2 size={16} className="ml-auto text-[#1E3A8A]" />}
+              </button>
+            )
+          })}
+        </div>
+        <button onClick={handlePay} disabled={processing} className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#14263F] to-[#1E3A8A] text-white text-sm font-semibold py-3.5 rounded-xl hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 disabled:opacity-60">
+          {processing ? "Processing..." : `Pay ${naira(applicationFeeAmount)}`}
+        </button>
+      </div>
+
+      <button onClick={() => navigate(`${base}/review`)} className="flex items-center gap-1.5 text-sm text-black/50 hover:text-black transition-colors w-fit">
+        <ArrowLeft size={16} /> Back
+      </button>
+    </div>
+  )
+}
+next is documentspage
+import { useState } from "react"
+import { useNavigate, useParams } from "react-router-dom"
+import { ArrowRight, ArrowLeft, Upload, FileText, CheckCircle2 } from "lucide-react"
+import { useApplication } from "./ApplicationContext"
+import type { Documents } from "./ApplicationContext"
+import { trackConfigs } from "./trackconfig"
+import type { Track } from "./trackconfig"
+
+// Labels change per track's education mode, but the underlying Documents
+// shape (primaryResult / passportPhoto / idDocument / supporting) stays the same.
+const labelsByMode = {
+  olevel: {
+    primaryResult: "O'Level Result",
+    idDocument: "Birth Certificate / Declaration of Age",
+    supporting: "JAMB Slip (if applicable)",
+    supportingRequired: false,
+  },
+  degree: {
+    primaryResult: "Degree Certificate",
+    idDocument: "Valid Identification",
+    supporting: "Statement of Purpose / Referee Letter",
+    supportingRequired: true,
+  },
+}
+
+function UploadRow({ label, required, fileName, onChange }: {
+  label: string
+  required: boolean
+  fileName: string
+  onChange: (name: string) => void
+}) {
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) onChange(e.target.files[0].name)
+  }
+  return (
+    <div className="flex items-center justify-between gap-4 py-4 border-b border-black/5 last:border-b-0">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${fileName ? "bg-green-50" : "bg-black/5"}`}>
+          {fileName ? <CheckCircle2 size={16} className="text-green-600" /> : <FileText size={16} className="text-black/40" />}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-black">{label} {required && <span className="text-red-400">*</span>}</p>
+          <p className="text-xs text-black/40 truncate">{fileName || "PDF, JPG or PNG · Max 5MB"}</p>
+        </div>
+      </div>
+      <label className="flex-shrink-0 flex items-center gap-1.5 text-xs font-medium text-[#1E3A8A] border border-[#1E3A8A]/20 px-3.5 py-2 rounded-lg cursor-pointer hover:bg-[#1E3A8A]/5 transition-colors">
+        <Upload size={13} /> {fileName ? "Replace" : "Upload"}
+        <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFile} className="hidden" />
+      </label>
+    </div>
+  )
+}
+
+export default function DocumentsPage() {
+  const { track: trackParam } = useParams<{ track: string }>()
+  const track = (trackParam ?? "undergraduate") as Track
+  const config = trackConfigs[track]
+  const labels = labelsByMode[config.educationMode]
+  const base = `/admission/apply/${track}`
+
+  const navigate = useNavigate()
+  const { data, setDocuments } = useApplication()
+  const [docs, setDocs] = useState<Documents>(data.documents)
+
+  const canContinue = !!(docs.primaryResult && docs.passportPhoto && docs.idDocument && (!labels.supportingRequired || docs.supporting))
+
+  const handleContinue = () => {
+    if (!canContinue) return
+    setDocuments(docs)
+    navigate(`${base}/review`)
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <span className="font-mono text-xs tracking-[0.2em] uppercase text-black/40">Documents</span>
+        <h1 className="font-serif text-2xl md:text-3xl font-semibold text-black mt-2">Upload Your Documents</h1>
+        <p className="text-sm text-black/55 mt-2">Upload clear, legible copies. Accepted formats: PDF, JPG, PNG.</p>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-black/5 px-6">
+        <UploadRow label={labels.primaryResult} required fileName={docs.primaryResult} onChange={(name) => setDocs({ ...docs, primaryResult: name })} />
+        <UploadRow label="Passport Photograph" required fileName={docs.passportPhoto} onChange={(name) => setDocs({ ...docs, passportPhoto: name })} />
+        <UploadRow label={labels.idDocument} required fileName={docs.idDocument} onChange={(name) => setDocs({ ...docs, idDocument: name })} />
+        <UploadRow label={labels.supporting} required={labels.supportingRequired} fileName={docs.supporting} onChange={(name) => setDocs({ ...docs, supporting: name })} />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <button onClick={() => navigate(`${base}/education`)} className="flex items-center gap-1.5 text-sm text-black/50 hover:text-black transition-colors">
+          <ArrowLeft size={16} /> Back
+        </button>
+        <button onClick={handleContinue} disabled={!canContinue} className="flex items-center gap-2 bg-gradient-to-r from-[#14263F] to-[#1E3A8A] text-white text-sm font-semibold px-7 py-3.5 rounded-xl hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 disabled:opacity-40 disabled:hover:translate-y-0">
+          Continue <ArrowRight size={16} />
+        </button>
+      </div>
+    </div>
+  )
+}
+next is educationPage
+import { useState } from "react"
+import { useNavigate, useParams } from "react-router-dom"
+import { ArrowRight, ArrowLeft, BookOpen, GraduationCap, Plus, Trash2, CheckCircle2, Lock } from "lucide-react"
+import { useApplication } from "./ApplicationContext"
+import type { EducationInfo, Subject } from "./ApplicationContext"
+import { trackConfigs } from "./trackconfig"
+import type { Track } from "./trackconfig"
+
+const inputClass = "border border-black/15 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#1E3A8A] transition-colors"
+const gradeOptions = ["A1", "B2", "B3", "C4", "C5", "C6", "D7", "E8", "F9"]
+const classOfDegreeOptions = ["First Class", "Second Class Upper", "Second Class Lower", "Third Class", "Pass"]
+
+const subjectCategories: { group: string; subjects: string[] }[] = [
+  { group: "Core / General", subjects: ["English Language", "Mathematics", "Civic Education"] },
+  { group: "Science", subjects: ["Physics", "Chemistry", "Biology", "Further Mathematics", "Agricultural Science", "Geography", "Computer Studies"] },
+  { group: "Arts", subjects: ["Literature in English", "Government", "History", "CRS/IRS", "French", "Fine Art", "Music"] },
+  { group: "Commercial", subjects: ["Financial Accounting", "Commerce", "Economics", "Office Practice", "Marketing", "Insurance"] },
+]
+
+function Field({ label, children, verified }: { label: string; children: React.ReactNode; verified?: boolean }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1.5">
+        <label className="font-mono text-xs tracking-wide uppercase text-black/50">{label}</label>
+        {verified && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600"><CheckCircle2 size={11} /> Verified</span>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function SubjectSelect({ value, onChange, usedSubjects }: { value: string; onChange: (v: string) => void; usedSubjects: string[] }) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={`${inputClass} flex-1`}>
+      <option value="">Select subject</option>
+      {subjectCategories.map((cat) => (
+        <optgroup key={cat.group} label={cat.group}>
+          {cat.subjects.map((s) => (
+            <option key={s} value={s} disabled={usedSubjects.includes(s) && s !== value}>{s}</option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
+  )
+}
+
+export default function EducationPage() {
+  const { track: trackParam } = useParams<{ track: string }>()
+  const track = (trackParam ?? "undergraduate") as Track
+  const config = trackConfigs[track]
+  const navigate = useNavigate()
+  const base = `/admission/apply/${track}`
+
+  const { data, setEducation } = useApplication()
+  const isDegreeMode = config.educationMode === "degree"
+  const isLockedGraduate = data.isEduNovaGraduate
+
+  const [form, setForm] = useState<EducationInfo>(
+    !isDegreeMode && data.education.subjects.length === 0
+      ? { ...data.education, subjects: [
+          { subject: "English Language", grade: "" }, { subject: "Mathematics", grade: "" },
+          { subject: "", grade: "" }, { subject: "", grade: "" }, { subject: "", grade: "" },
+        ] }
+      : data.education
+  )
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [e.target.name]: e.target.value })
+
+  const updateSubject = (index: number, field: keyof Subject, value: string) => {
+    const next = [...form.subjects]
+    next[index] = { ...next[index], [field]: value }
+    setForm({ ...form, subjects: next })
+  }
+  const addSubject = () => setForm({ ...form, subjects: [...form.subjects, { subject: "", grade: "" }] })
+  const removeSubject = (i: number) => setForm({ ...form, subjects: form.subjects.filter((_, idx) => idx !== i) })
+  const usedSubjects = form.subjects.map((s) => s.subject).filter(Boolean)
+  const filledSubjects = form.subjects.filter((s) => s.subject && s.grade)
+
+  const canContinue = isDegreeMode
+  ? !!(form.institution && form.degree && form.graduationYear && form.classOfDegree && form.cgpa)
+  : !!(form.schoolName && form.examType && form.examNumber && form.examYear && filledSubjects.length >= 5)
+  const handleContinue = () => {
+    if (!canContinue) return
+    setEducation(isDegreeMode ? form : { ...form, subjects: filledSubjects })
+    navigate(`${base}/documents`)
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <span className="font-mono text-xs tracking-[0.2em] uppercase text-black/40">
+          {isDegreeMode ? "Previous Education" : "Academic Information"}
+        </span>
+        <h1 className="font-serif text-2xl md:text-3xl font-semibold text-black mt-2">
+          {isDegreeMode ? "Your Academic Background" : "O'Level & Examination Details"}
+        </h1>
+        <p className="text-sm text-black/55 mt-2">
+          {isDegreeMode
+            ? isLockedGraduate
+              ? "We've pulled in your EduNova academic record. Review the details below."
+              : "Tell us about the degree that qualifies you for this programme."
+            : "Enter your exam details and at least five subject grades."}
+        </p>
+      </div>
+
+      {isDegreeMode && isLockedGraduate && (
+        <div className="flex items-start gap-3 bg-[#1E3A8A]/[0.04] border border-[#1E3A8A]/10 rounded-xl p-4">
+          <Lock size={16} strokeWidth={1.75} className="text-[#1E3A8A] flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-black/60 leading-relaxed">
+            Institution, degree, and grade details are locked for accuracy. Contact the Registrar's Office if something looks wrong.
+          </p>
+        </div>
+      )}
+
+      {/* DEGREE MODE — postgraduate / international */}
+      {isDegreeMode ? (
+        <div className="bg-white rounded-2xl border border-black/5 p-6 flex flex-col gap-5">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-8 h-8 rounded-full bg-[#1E3A8A]/10 flex items-center justify-center"><GraduationCap size={16} strokeWidth={1.75} className="text-[#1E3A8A]" /></div>
+            <p className="font-mono text-xs tracking-widest uppercase text-[#B8901F]">Degree Details</p>
+          </div>
+
+          <Field label="Institution" verified={isLockedGraduate}>
+            <input name="institution" value={form.institution} onChange={handleChange} disabled={isLockedGraduate} className={`${inputClass} ${isLockedGraduate ? "bg-black/[0.02] text-black/60 cursor-not-allowed" : ""}`} />
+          </Field>
+          <Field label="Degree Obtained" verified={isLockedGraduate}>
+            <input name="degree" value={form.degree} onChange={handleChange} disabled={isLockedGraduate} className={`${inputClass} ${isLockedGraduate ? "bg-black/[0.02] text-black/60 cursor-not-allowed" : ""}`} />
+          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <Field label="Graduation Year" verified={isLockedGraduate}>
+              <input name="graduationYear" value={form.graduationYear} onChange={handleChange} disabled={isLockedGraduate} className={`${inputClass} ${isLockedGraduate ? "bg-black/[0.02] text-black/60 cursor-not-allowed" : ""}`} />
+            </Field>
+            <Field label="Class of Degree" verified={isLockedGraduate}>
+              {isLockedGraduate ? (
+                <input value={form.classOfDegree} disabled className={`${inputClass} bg-black/[0.02] text-black/60 cursor-not-allowed`} />
+              ) : (
+                <select name="classOfDegree" value={form.classOfDegree} onChange={handleChange} className={inputClass}>
+                  <option value="">Select...</option>
+                  {classOfDegreeOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              )}
+            </Field>
+          </div>
+          <Field label="CGPA" verified={isLockedGraduate}>
+            <input name="cgpa" value={form.cgpa} onChange={handleChange} disabled={isLockedGraduate} placeholder="e.g. 4.32 / 5.00" className={`${inputClass} ${isLockedGraduate ? "bg-black/[0.02] text-black/60 cursor-not-allowed" : ""} max-w-[200px]`} />
+          </Field>
+        </div>
+      ) : (
+        /* O'LEVEL MODE — undergraduate / certificate / odl */
+        <>
+          <div className="bg-white rounded-2xl border border-black/5 p-6 flex flex-col gap-5">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-full bg-[#1E3A8A]/10 flex items-center justify-center"><BookOpen size={16} strokeWidth={1.75} className="text-[#1E3A8A]" /></div>
+              <p className="font-mono text-xs tracking-widest uppercase text-[#B8901F]">Examination Details</p>
+            </div>
+            <Field label="Secondary School Attended"><input name="schoolName" value={form.schoolName} onChange={handleChange} className={inputClass} /></Field>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+              <Field label="Exam Type">
+                <select name="examType" value={form.examType} onChange={handleChange} className={inputClass}>
+                  <option value="">Select...</option>
+                  <option value="WAEC">WAEC</option>
+                  <option value="NECO">NECO</option>
+                  <option value="NABTEB">NABTEB</option>
+                </select>
+              </Field>
+              <Field label="Exam Number"><input name="examNumber" value={form.examNumber} onChange={handleChange} className={inputClass} /></Field>
+              <Field label="Exam Year"><input name="examYear" value={form.examYear} onChange={handleChange} placeholder="2025" className={inputClass} /></Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <Field label="JAMB Registration Number"><input name="jambNumber" value={form.jambNumber} onChange={handleChange} className={inputClass} /></Field>
+              <Field label="JAMB Score"><input name="jambScore" value={form.jambScore} onChange={handleChange} className={inputClass} /></Field>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-black/5 p-6">
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-mono text-xs tracking-widest uppercase text-[#B8901F]">O'Level Subjects & Grades <span className="text-black/30 normal-case">(min. 5)</span></p>
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${filledSubjects.length >= 5 ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600"}`}>
+                {filledSubjects.length} of {form.subjects.length} filled
+              </span>
+            </div>
+            <p className="text-xs text-black/40 mb-5">Choose from Core, Science, Arts, or Commercial subjects.</p>
+            <div className="flex flex-col gap-3">
+              {form.subjects.map((s, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <SubjectSelect value={s.subject} onChange={(v) => updateSubject(i, "subject", v)} usedSubjects={usedSubjects} />
+                  <select value={s.grade} onChange={(e) => updateSubject(i, "grade", e.target.value)} className={`${inputClass} w-24 flex-shrink-0`}>
+                    <option value="">Grade</option>
+                    {gradeOptions.map((g) => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                  <button type="button" onClick={() => removeSubject(i)} disabled={form.subjects.length <= 5} className="p-2 text-black/30 hover:text-red-500 disabled:opacity-20 disabled:cursor-not-allowed transition-colors flex-shrink-0">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={addSubject} className="flex items-center gap-1.5 text-sm text-[#1E3A8A] font-medium mt-4 hover:underline">
+              <Plus size={15} /> Add another subject
+            </button>
+          </div>
+        </>
+      )}
+
+      <div className="flex items-center justify-between">
+        <button onClick={() => navigate(`${base}/personal-information`)} className="flex items-center gap-1.5 text-sm text-black/50 hover:text-black transition-colors">
+          <ArrowLeft size={16} /> Back
+        </button>
+        <button onClick={handleContinue} disabled={!canContinue} className="flex items-center gap-2 bg-gradient-to-r from-[#14263F] to-[#1E3A8A] text-white text-sm font-semibold px-7 py-3.5 rounded-xl hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 disabled:opacity-40 disabled:hover:translate-y-0">
+          Continue <ArrowRight size={16} />
+        </button>
+      </div>
+    </div>
+  )
+}
+next is personalinformation page 
+import { useState } from "react"
+import { useNavigate, useParams } from "react-router-dom"
+import { ArrowRight, User } from "lucide-react"
+import { useApplication } from "./ApplicationContext"
+import type { PersonalInfo } from "./ApplicationContext"
+
+const lgasByState: Record<string, string[]> = {
+  Lagos: ["Agege", "Ajeromi-Ifelodun", "Alimosho", "Amuwo-Odofin", "Apapa", "Badagry", "Epe", "Eti Osa", "Ibeju-Lekki", "Ifako-Ijaiye", "Ikeja", "Ikorodu", "Kosofe", "Lagos Island", "Lagos Mainland", "Mushin", "Ojo", "Oshodi-Isolo", "Shomolu", "Surulere"],
+  Oyo: ["Ibadan North", "Ibadan North-East", "Ibadan North-West", "Ibadan South-East", "Ibadan South-West", "Egbeda", "Akinyele", "Ogbomosho North", "Ogbomosho South", "Oyo East", "Oyo West", "Iseyin"],
+  Kano: ["Kano Municipal", "Fagge", "Dala", "Gwale", "Tarauni", "Nasarawa", "Ungogo", "Kumbotso", "Gwarzo", "Bichi"],
+  Rivers: ["Port Harcourt", "Obio/Akpor", "Okrika", "Eleme", "Ikwerre", "Etche", "Oyigbo", "Bonny", "Degema", "Ahoada East"],
+  "Abuja (FCT)": ["Abaji", "Abuja Municipal", "Bwari", "Gwagwalada", "Kuje", "Kwali"],
+  Kaduna: ["Kaduna North", "Kaduna South", "Zaria", "Sabon Gari", "Chikun", "Igabi", "Kachia", "Soba"],
+  Enugu: ["Enugu East", "Enugu North", "Enugu South", "Nsukka", "Udi", "Awgu", "Igbo Etiti"],
+  Delta: ["Warri South", "Warri North", "Uvwie", "Ughelli North", "Sapele", "Oshimili South", "Isoko North"],
+  Anambra: ["Awka North", "Awka South", "Onitsha North", "Onitsha South", "Nnewi North", "Idemili North", "Ihiala"],
+  Ogun: ["Abeokuta North", "Abeokuta South", "Ado-Odo/Ota", "Ijebu Ode", "Sagamu", "Ifo"],
+}
+const nigerianStates = Object.keys(lgasByState)
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="font-mono text-xs tracking-wide uppercase text-black/50">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+const inputClass = "border border-black/15 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#1E3A8A] transition-colors"
+
+export default function PersonalInformation() {
+  const { track } = useParams<{ track: string }>()
+  const navigate = useNavigate()
+  const { data, setPersonal } = useApplication()
+  const [form, setForm] = useState<PersonalInfo>(data.personal)
+
+  const availableLgas = form.state ? lgasByState[form.state] ?? [] : []
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value })
+  }
+  const handleStateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setForm({ ...form, state: e.target.value, lga: "" })
+  }
+
+  const canContinue = form.dob && form.gender && form.nationality && form.state && form.lga && form.address && form.phone
+
+  const handleContinue = () => {
+    if (!canContinue) return
+    setPersonal(form)
+    navigate(`/admission/apply/${track}/education`)
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <span className="font-mono text-xs tracking-[0.2em] uppercase text-black/40">Personal Information</span>
+        <p className="text-sm text-black/55 mt-2">This information should match your official documents.</p>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-black/5 p-6 flex flex-col gap-5">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-full bg-[#1E3A8A]/10 flex items-center justify-center">
+            <User size={16} strokeWidth={1.75} className="text-[#1E3A8A]" />
+          </div>
+          <p className="font-mono text-xs tracking-widest uppercase text-[#B8901F]">Basic Details</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <Field label="Date of Birth"><input type="date" name="dob" value={form.dob} onChange={handleChange} className={inputClass} /></Field>
+          <Field label="Gender">
+            <select name="gender" value={form.gender} onChange={handleChange} className={inputClass}>
+              <option value="">Select...</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <Field label="Nationality"><input name="nationality" value={form.nationality} onChange={handleChange} placeholder="Nigerian" className={inputClass} /></Field>
+          <Field label="State of Origin">
+            <select name="state" value={form.state} onChange={handleStateChange} className={inputClass}>
+              <option value="">Select...</option>
+              {nigerianStates.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
+        </div>
+
+        <Field label="Local Government Area">
+          <select name="lga" value={form.lga} onChange={handleChange} disabled={!form.state} className={`${inputClass} disabled:bg-black/[0.02] disabled:text-black/30 disabled:cursor-not-allowed`}>
+            <option value="">{form.state ? "Select..." : "Select a state first"}</option>
+            {availableLgas.map((l) => <option key={l} value={l}>{l}</option>)}
+          </select>
+        </Field>
+
+        <Field label="Residential Address">
+          <textarea name="address" value={form.address} onChange={handleChange as any} rows={3} className={`${inputClass} resize-none`} />
+        </Field>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <Field label="Phone Number"><input name="phone" type="tel" value={form.phone} onChange={handleChange} className={inputClass} /></Field>
+          <Field label="Alternate Phone (optional)"><input name="altPhone" type="tel" value={form.altPhone} onChange={handleChange} className={inputClass} /></Field>
+        </div>
+      </div>
+
+      <button onClick={handleContinue} disabled={!canContinue} className="self-end flex items-center gap-2 bg-gradient-to-r from-[#14263F] to-[#1E3A8A] text-white text-sm font-semibold px-7 py-3.5 rounded-xl hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 disabled:opacity-40 disabled:hover:translate-y-0">
+        Continue <ArrowRight size={16} />
+      </button>
+    </div>
+  )
+}
+next is reviewapplication page
+import { useNavigate, useParams } from "react-router-dom"
+import { ArrowRight, ArrowLeft, Pencil, User, BookOpen, FileText } from "lucide-react"
+import { useApplication } from "./ApplicationContext"
+import { trackConfigs } from "./trackconfig"
+import type { Track } from "./trackconfig"
+
+function SectionCard({ icon: Icon, title, editPath, children }: { icon: any; title: string; editPath: string; children: React.ReactNode }) {
+  const navigate = useNavigate()
+  return (
+    <div className="bg-white rounded-2xl border border-black/5 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-[#1E3A8A]/10 flex items-center justify-center"><Icon size={16} strokeWidth={1.75} className="text-[#1E3A8A]" /></div>
+          <p className="font-mono text-xs tracking-widest uppercase text-[#B8901F]">{title}</p>
+        </div>
+        <button onClick={() => navigate(editPath)} className="flex items-center gap-1 text-xs font-medium text-[#1E3A8A] hover:underline">
+          <Pencil size={12} /> Edit
+        </button>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between text-sm py-2 border-b border-black/5 last:border-b-0">
+      <span className="text-black/50">{label}</span>
+      <span className="font-medium text-black text-right">{value || "—"}</span>
+    </div>
+  )
+}
+
+export default function ReviewApplication() {
+  const { track: trackParam } = useParams<{ track: string }>()
+  const track = (trackParam ?? "undergraduate") as Track
+  const config = trackConfigs[track]
+  const base = `/admission/apply/${track}`
+  const isDegreeMode = config.educationMode === "degree"
+
+  const navigate = useNavigate()
+  const { data, isPersonalComplete, isEducationComplete, isDocumentsComplete } = useApplication()
+
+  const allComplete = isPersonalComplete && isEducationComplete(config.educationMode) && isDocumentsComplete
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <span className="font-mono text-xs tracking-[0.2em] uppercase text-black/40">Review</span>
+        <h1 className="font-serif text-2xl md:text-3xl font-semibold text-black mt-2">Review Application</h1>
+        <p className="text-sm text-black/55 mt-2">Check every section carefully. You can edit any part before submitting.</p>
+      </div>
+
+      <SectionCard icon={User} title="Personal Information" editPath={`${base}/personal-information`}>
+        <Row label="Date of Birth" value={data.personal.dob} />
+        <Row label="Gender" value={data.personal.gender} />
+        <Row label="State / LGA" value={[data.personal.state, data.personal.lga].filter(Boolean).join(" / ")} />
+        <Row label="Address" value={data.personal.address} />
+        <Row label="Phone Number" value={data.personal.phone} />
+      </SectionCard>
+
+      <SectionCard icon={BookOpen} title={isDegreeMode ? "Previous Education" : "Academic Information"} editPath={`${base}/education`}>
+        {isDegreeMode ? (
+          <>
+            <Row label="Institution" value={data.education.institution} />
+            <Row label="Degree" value={data.education.degree} />
+            <Row label="Class of Degree" value={data.education.classOfDegree} />
+            <Row label="CGPA" value={data.education.cgpa} />
+          </>
+        ) : (
+          <>
+            <Row label="School Attended" value={data.education.schoolName} />
+            <Row label="Exam Type" value={data.education.examType} />
+            <Row label="Exam Number" value={data.education.examNumber} />
+            <div className="pt-3">
+              <p className="text-xs text-black/40 mb-2">Subjects & Grades</p>
+              <div className="flex flex-wrap gap-2">
+                {data.education.subjects.map((s, i) => (
+                  <span key={i} className="text-xs font-medium bg-[#1E3A8A]/5 text-[#1E3A8A] px-2.5 py-1 rounded-full">{s.subject} — {s.grade}</span>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </SectionCard>
+
+      <SectionCard icon={FileText} title="Documents" editPath={`${base}/documents`}>
+        <Row label="Primary Result" value={data.documents.primaryResult} />
+        <Row label="Passport Photograph" value={data.documents.passportPhoto} />
+        <Row label="Identification" value={data.documents.idDocument} />
+        <Row label="Supporting Document" value={data.documents.supporting} />
+      </SectionCard>
+
+      {!allComplete && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
+          <p className="text-sm text-amber-700">Some sections are incomplete. Please go back and fill in all required fields before proceeding.</p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <button onClick={() => navigate(`${base}/documents`)} className="flex items-center gap-1.5 text-sm text-black/50 hover:text-black transition-colors">
+          <ArrowLeft size={16} /> Back
+        </button>
+        <button onClick={() => allComplete && navigate(`${base}/fee`)} disabled={!allComplete} className="flex items-center gap-2 bg-gradient-to-r from-[#14263F] to-[#1E3A8A] text-white text-sm font-semibold px-7 py-3.5 rounded-xl hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 disabled:opacity-40 disabled:hover:translate-y-0">
+          Confirm & Continue <ArrowRight size={16} />
+        </button>
+      </div>
+    </div>
+  )
+}
+next is submit application page
+import { useState } from "react"
+import { useNavigate, useParams } from "react-router-dom"
+import { CheckCircle2, ArrowLeft, Clock, Sparkles } from "lucide-react"
+import { useApplication } from "./ApplicationContext"
+import { trackConfigs } from "./trackconfig"
+import type { Track } from "./trackconfig"
+
+export default function SubmitApplicationPage() {
+  const { track: trackParam } = useParams<{ track: string }>()
+  const track = (trackParam ?? "undergraduate") as Track
+  const config = trackConfigs[track]
+  const base = `/admission/apply/${track}`
+
+  const navigate = useNavigate()
+  const { data, setSubmitted } = useApplication()
+  const [confirmed, setConfirmed] = useState(false)
+
+  const handleSubmit = () => {
+    if (!confirmed) return
+    setSubmitted(true)
+  }
+
+  if (data.submitted) {
+    return (
+      <div className="flex flex-col items-center text-center gap-6 py-8">
+        <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
+          <CheckCircle2 size={30} strokeWidth={1.75} className="text-green-600" />
+        </div>
+        <div>
+          <h1 className="font-serif text-2xl md:text-3xl font-semibold text-black mb-2">Application Submitted</h1>
+          <p className="text-sm text-black/55 max-w-sm leading-relaxed">
+            Thank you, {data.applicantName}. Your {config.label.toLowerCase()} application for {data.programmeTitle} has been received and is now under review.
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-black/5 p-6 w-full max-w-sm">
+          <div className="flex items-center gap-3 justify-center mb-3">
+            <Clock size={18} strokeWidth={1.75} className="text-amber-500" />
+            <span className="text-sm font-medium text-black">Status: Under Review</span>
+          </div>
+          <p className="text-xs text-black/45">Application Number: <span className="font-mono">{data.applicationNumber}</span></p>
+          <p className="text-xs text-black/45 mt-1">You'll be notified by email once a decision has been made.</p>
+        </div>
+
+        <button onClick={() => navigate(base)} className="text-sm text-[#1E3A8A] font-medium hover:underline">
+          Back to Dashboard
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <span className="font-mono text-xs tracking-[0.2em] uppercase text-black/40">Submit</span>
+        <h1 className="font-serif text-2xl md:text-3xl font-semibold text-black mt-2">Submit Application</h1>
+        <p className="text-sm text-black/55 mt-2">This is the final step. Once submitted, your application cannot be edited.</p>
+      </div>
+
+      <div className="bg-gradient-to-br from-[#14263F] to-[#1E3A8A] rounded-2xl p-7 text-center">
+        <Sparkles size={22} className="text-[#B8901F] mx-auto mb-3" />
+        <p className="font-serif text-white text-lg font-semibold mb-1">Everything looks ready</p>
+        <p className="text-white/60 text-sm">Personal information, education, documents, and application fee are all complete.</p>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-black/5 p-6">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" checked={confirmed} onChange={() => setConfirmed(!confirmed)} className="w-4 h-4 mt-0.5 rounded border-black/20 accent-[#1E3A8A]" />
+          <span className="text-sm text-black/70">I confirm that all information provided in this application is accurate and complete to the best of my knowledge.</span>
+        </label>
+        <button onClick={handleSubmit} disabled={!confirmed} className="w-full mt-6 bg-gradient-to-r from-[#14263F] to-[#1E3A8A] text-white text-sm font-semibold py-4 rounded-xl hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 disabled:opacity-40 disabled:hover:translate-y-0">
+          Submit Application
+        </button>
+      </div>
+
+      <button onClick={() => navigate(`${base}/fee`)} className="flex items-center gap-1.5 text-sm text-black/50 hover:text-black transition-colors w-fit">
+        <ArrowLeft size={16} /> Back
+      </button>
+    </div>
+  )
+}
+next is trackconfig page
+export type Track = "undergraduate" | "postgraduate" | "certificates" | "odl" | "international"
+
+export interface ProgrammeInfo {
+  title: string
+  duration: string
+  mode: string
+  qualification: string
+}
+
+export interface TrackConfig {
+  label: string 
+  heroLabel: string              // shown in the hero eyebrow
+  educationMode: "olevel" | "degree"   // which Education page section to show
+  hasApplicantTypeStep: boolean  // only postgraduate asks "are you an EduNova graduate?"
+  faculties: string[]
+  departmentsByFaculty: Record<string, string[]>
+  programmesByDept: Record<string, ProgrammeInfo>
+  generalRequirements: string[]
+  applicationRequirements: string[]
+}
+
+const engineeringDepts = [
+  "Mechanical Engineering", "Civil Engineering", "Electrical & Electronics Engineering",
+  "Chemical Engineering", "Mechatronics Engineering",
+]
+const computingDepts = ["Computer Science", "Software Engineering", "Artificial Intelligence", "Cybersecurity"]
+const businessDepts = ["Accounting", "Marketing", "Business Administration", "Economics"]
+
+const sharedFaculties = [
+  "Faculty of Engineering & Technology",
+  "Faculty of Computing & AI",
+  "Faculty of Business & Management",
+  "Faculty of Health Sciences",
+]
+
+const sharedDepartmentsByFaculty: Record<string, string[]> = {
+  "Faculty of Engineering & Technology": engineeringDepts,
+  "Faculty of Computing & AI": computingDepts,
+  "Faculty of Business & Management": businessDepts,
+  "Faculty of Health Sciences": ["Nursing", "Public Health", "Biomedical Sciences"],
+}
+
+export const trackConfigs: Record<Track, TrackConfig> = {
+  undergraduate: {
+    label: "Undergraduate",
+    heroLabel: "Undergraduate Application",
+    educationMode: "olevel",
+    hasApplicantTypeStep: false,
+    faculties: sharedFaculties,
+    departmentsByFaculty: sharedDepartmentsByFaculty,
+    programmesByDept: {
+      "Mechanical Engineering": { title: "B.Eng. Mechanical Engineering", duration: "5 Years", mode: "Full-Time", qualification: "Bachelor of Engineering" },
+      "Civil Engineering": { title: "B.Eng. Civil Engineering", duration: "5 Years", mode: "Full-Time", qualification: "Bachelor of Engineering" },
+      "Computer Science": { title: "B.Sc. Computer Science", duration: "4 Years", mode: "Full-Time", qualification: "Bachelor of Science" },
+      "Business Administration": { title: "B.Sc. Business Administration", duration: "4 Years", mode: "Full-Time", qualification: "Bachelor of Science" },
+      "Nursing": { title: "B.NSc. Nursing Science", duration: "5 Years", mode: "Full-Time", qualification: "Bachelor of Nursing Science" },
+    },
+    generalRequirements: [
+      "Minimum of five relevant O'Level credits",
+      "Mathematics and English Language required",
+      "Relevant science subjects required",
+    ],
+    applicationRequirements: [
+      "O'Level result", "Passport photograph", "Birth certificate / declaration of age",
+      "Valid identification", "JAMB information, where applicable",
+    ],
+  },
+
+  postgraduate: {
+    label: "Postgraduate",
+    heroLabel: "Postgraduate Application",
+    educationMode: "degree",
+    hasApplicantTypeStep: true,
+    faculties: sharedFaculties,
+    departmentsByFaculty: sharedDepartmentsByFaculty,
+    programmesByDept: {
+      "Mechanical Engineering": { title: "M.Sc. Mechanical Engineering", duration: "2 Years", mode: "Full-Time", qualification: "Master of Science" },
+      "Computer Science": { title: "M.Sc. Computer Science", duration: "2 Years", mode: "Full-Time", qualification: "Master of Science" },
+      "Business Administration": { title: "MBA", duration: "18 Months", mode: "Full-Time / Part-Time", qualification: "Master of Business Administration" },
+      "Public Health": { title: "M.P.H. Public Health", duration: "2 Years", mode: "Full-Time", qualification: "Master of Public Health" },
+    },
+    generalRequirements: [
+      "Minimum of Second Class Lower degree or equivalent",
+      "Degree in a relevant field",
+      "Minimum of 2 years work experience (programme-dependent)",
+    ],
+    applicationRequirements: [
+      "Degree certificate", "Academic transcript", "Statement of purpose",
+      "Two referee reports", "Valid identification",
+    ],
+  },
+
+  certificates: {
+    label: "Professional Certificate",
+    heroLabel: "Professional Certificate Application",
+    educationMode: "olevel",
+    hasApplicantTypeStep: false,
+    faculties: ["School of Computing & Digital Technologies", "School of Business & Entrepreneurship"],
+    departmentsByFaculty: {
+      "School of Computing & Digital Technologies": ["Data Analytics", "UI/UX Design", "Cloud Computing"],
+      "School of Business & Entrepreneurship": ["Digital Marketing", "Project Management"],
+    },
+    programmesByDept: {
+       "Data Analytics": { title: "Certificate in Data Analytics", duration: "6 Months", mode: "Part-Time", qualification: "Professional Certificate" },
+  "UI/UX Design": { title: "Certificate in UI/UX Design", duration: "4 Months", mode: "Part-Time", qualification: "Professional Certificate" },
+  "Cloud Computing": { title: "Certificate in Cloud Computing", duration: "6 Months", mode: "Part-Time", qualification: "Professional Certificate" },
+  "Digital Marketing": { title: "Certificate in Digital Marketing", duration: "3 Months", mode: "Part-Time", qualification: "Professional Certificate" },
+  "Project Management": { title: "Certificate in Project Management", duration: "4 Months", mode: "Part-Time", qualification: "Professional Certificate" },
+    },
+    generalRequirements: ["Minimum age of 16", "SSCE or equivalent"],
+    applicationRequirements: ["Valid identification", "Passport photograph"],
+  },
+
+  odl: {
+    label: "Open & Distance Learning",
+    heroLabel: "Open & Distance Learning Application",
+    educationMode: "olevel",
+    hasApplicantTypeStep: false,
+    faculties: ["School of Business", "School of Computing", "School of Education"],
+    departmentsByFaculty: {
+      "School of Business": ["Business Administration"],
+      "School of Computing": ["Computer Science"],
+      "School of Education": ["Educational Management"],
+    },
+    programmesByDept: {
+      "Business Administration": { title: "B.Sc. Business Administration (ODL)", duration: "4 Years", mode: "Online", qualification: "Bachelor of Science" },
+      "Computer Science": { title: "B.Sc. Computer Science (ODL)", duration: "4 Years", mode: "Online", qualification: "Bachelor of Science" },
+    },
+    generalRequirements: ["Minimum of five relevant O'Level credits", "Reliable internet access for online learning"],
+    applicationRequirements: ["O'Level result", "Valid identification", "Passport photograph"],
+  },
+
+  international: {
+    label: "International Programmes",
+    heroLabel: "International Application",
+    educationMode: "degree",
+    hasApplicantTypeStep: false,
+    faculties: sharedFaculties,
+    departmentsByFaculty: sharedDepartmentsByFaculty,
+    programmesByDept: {
+    "Mechanical Engineering": { title: "B.Eng. Mechanical Engineering (International)", duration: "5 Years", mode: "Full-Time", qualification: "Bachelor of Engineering" },
+    "Civil Engineering": { title: "B.Eng. Civil Engineering (International)", duration: "5 Years", mode: "Full-Time", qualification: "Bachelor of Engineering" },
+    "Electrical & Electronics Engineering": { title: "B.Eng. Electrical & Electronics Engineering (International)", duration: "5 Years", mode: "Full-Time", qualification: "Bachelor of Engineering" },
+    "Chemical Engineering": { title: "B.Eng. Chemical Engineering (International)", duration: "5 Years", mode: "Full-Time", qualification: "Bachelor of Engineering" },
+    "Mechatronics Engineering": { title: "B.Eng. Mechatronics Engineering (International)", duration: "5 Years", mode: "Full-Time", qualification: "Bachelor of Engineering" },
+    "Computer Science": { title: "B.Sc. Computer Science (International)", duration: "4 Years", mode: "Full-Time", qualification: "Bachelor of Science" },
+    "Software Engineering": { title: "B.Sc. Software Engineering (International)", duration: "4 Years", mode: "Full-Time", qualification: "Bachelor of Science" },
+    "Artificial Intelligence": { title: "B.Sc. Artificial Intelligence (International)", duration: "4 Years", mode: "Full-Time", qualification: "Bachelor of Science" },
+    "Cybersecurity": { title: "B.Sc. Cybersecurity (International)", duration: "4 Years", mode: "Full-Time", qualification: "Bachelor of Science" },
+    "Accounting": { title: "B.Sc. Accounting (International)", duration: "4 Years", mode: "Full-Time", qualification: "Bachelor of Science" },
+    "Marketing": { title: "B.Sc. Marketing (International)", duration: "4 Years", mode: "Full-Time", qualification: "Bachelor of Science" },
+    "Business Administration": { title: "B.Sc. Business Administration (International)", duration: "4 Years", mode: "Full-Time", qualification: "Bachelor of Science" },
+    "Economics": { title: "B.Sc. Economics (International)", duration: "4 Years", mode: "Full-Time", qualification: "Bachelor of Science" },
+    "Nursing": { title: "B.NSc. Nursing Science (International)", duration: "5 Years", mode: "Full-Time", qualification: "Bachelor of Nursing Science" },
+    "Public Health": { title: "B.Sc. Public Health (International)", duration: "4 Years", mode: "Full-Time", qualification: "Bachelor of Science" },
+    "Biomedical Sciences": { title: "B.Sc. Biomedical Sciences (International)", duration: "4 Years", mode: "Full-Time", qualification: "Bachelor of Science" },
+  },
+    generalRequirements: ["Equivalent secondary or degree qualification", "English language proficiency where required"],
+    applicationRequirements: ["Academic transcripts", "Passport", "Student visa documentation", "English proficiency result"],
+  },
+}
+
+export function getProgramme(track: Track, department: string): ProgrammeInfo | null {
+  return trackConfigs[track]?.programmesByDept[department] ?? null
+}
+lastly the signup import { useState } from "react"
+import { GraduationCap, BookOpen, Award, Laptop, Globe, ArrowRight, Sparkles, KeyRound,} from "lucide-react"
+import logo from "../assets/edunova-logo.webp"
+const programmeTypes = [
+  {
+    icon: GraduationCap,
+    title: "Undergraduate Programmes",
+    tagline: "Begin your undergraduate journey at EduNova.",
+    description: "Explore bachelor's degree programmes across Engineering, Computing, Business, Health Sciences, Arts, Sciences, and more.",
+    path: "/admission/apply/undergraduate",
+  },
+  {
+    icon: BookOpen,
+    title: "Postgraduate Programmes",
+    tagline: "Advance your knowledge and expertise.",
+    description: "Explore Master's and PhD programmes designed for advanced study, research, and professional development.",
+    path: "/admission/apply/postgraduate",
+  },
+  {
+    icon: Award,
+    title: "Professional Certificates",
+    tagline: "Build skills that move your career forward.",
+    description: "Gain industry-relevant knowledge and professional certifications through flexible programmes designed for career development.",
+    path: "/admission/apply/certificates",
+  },
+  {
+    icon: Laptop,
+    title: "Open & Distance Learning",
+    tagline: "Learn on your own terms.",
+    description: "Access flexible degree and certificate programmes designed for students and professionals who need adaptable learning options.",
+    path: "/admission/apply/odl",
+  },
+  {
+    icon: Globe,
+    title: "International Programmes",
+    tagline: "Study at EduNova from anywhere in the world.",
+    description: "Explore programmes and study opportunities designed for international students and global learners.",
+    path: "/admission/apply/international",
+  },
+]
+
+export default function AdmissionPortal() {
+  const [showContinue, setShowContinue] = useState(false)
+  const [appNumber, setAppNumber] = useState("")
+  const [password, setPassword] = useState("")
+
+  return (
+    <div className="min-h-screen bg-[#F6F6F2]">
+      <div className="relative bg-gradient-to-br from-[#0B1524] via-[#14263F] to-[#1E3A8A] overflow-hidden">
+        <div className="absolute -top-24 -right-24 w-72 h-72 bg-[#B8901F]/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-white/5 rounded-full blur-3xl" />
+        <div className="relative px-4 md:px-8 py-14 max-w-4xl mx-auto text-center flex flex-col items-center">
+          <div className="bg-[#F6F6F2]  mb-8 px-3 rounded-lg">
+            <img src={logo} alt="EduNova University" className="h-12 w-auto" />
+          </div>
+          <span className="inline-flex items-center gap-1.5 font-mono text-xs tracking-[0.2em] uppercase text-[#B8901F] mb-4">
+            <Sparkles size={13} />
+            Admission Portal
+          </span>
+          <h1 className="font-serif text-white text-3xl md:text-5xl font-semibold leading-tight">
+            Start Your Application
+          </h1>
+          <p className="font-sans text-white/70 text-base md:text-lg mt-4 max-w-lg leading-relaxed">
+            Choose the programme type you would like to apply for at EduNova University.
+          </p>
+        </div>
+      </div>
+      <div className="px-4 md:px-8 py-12 max-w-5xl mx-auto -mt-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {programmeTypes.map((type, index) => {
+            const Icon = type.icon
+            const isLast = index === programmeTypes.length - 1 && programmeTypes.length % 2 !== 0
+            return (
+              <a key={index} href={type.path} className={`group relative bg-white rounded-3xl border border-black/5 p-7 overflow-hidden transition-all duration-300 hover:border-transparent hover:shadow-xl ${isLast ? "sm:col-span-2 sm:max-w-md sm:mx-auto sm:w-full" : ""}`}>
+                <span className="absolute inset-0 bg-gradient-to-br from-[#14263F] to-[#1E3A8A] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative">
+                  <div className="w-14 h-14 rounded-2xl bg-[#1E3A8A]/8 group-hover:bg-white/10 flex items-center justify-center mb-5 transition-colors duration-300">
+                    <Icon size={26} strokeWidth={1.5} className="text-[#1E3A8A] group-hover:text-white transition-colors duration-300" />
+                  </div>
+                  <h3 className="font-serif text-xl font-semibold text-black group-hover:text-white transition-colors duration-300 mb-1.5">{type.title}</h3>
+                  <p className="text-sm font-medium text-[#B8901F] group-hover:text-[#B8901F] mb-3">{type.tagline}</p>
+                  <p className="text-sm text-black/55 group-hover:text-white/70 leading-relaxed mb-6 transition-colors duration-300">{type.description}</p>
+                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1E3A8A] group-hover:text-white transition-all duration-300 group-hover:gap-2.5">
+                    Apply Now
+                    <ArrowRight size={16} strokeWidth={2.5} />
+                  </span>
+                </div>
+              </a>
+            )
+          })}
+        </div>
+        <div className="mt-12 flex flex-col items-center text-center">
+          <p className="text-sm text-black/55 mb-3">Already started an application?</p>
+          {!showContinue ? (
+            <button onClick={() => setShowContinue(true)} className="inline-flex items-center gap-2 text-sm font-semibold text-[#1E3A8A] border border-[#1E3A8A]/20 px-6 py-3 rounded-xl hover:bg-[#1E3A8A]/5 transition-colors duration-200">
+              <KeyRound size={16} />
+              Continue Application
+            </button>
+          ) : (
+            <div className="bg-white rounded-2xl border border-black/5 p-6 max-w-sm w-full mt-2 shadow-sm">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2 text-left">
+                  <label className="font-mono text-xs tracking-wide uppercase text-black/50">
+                    Application Number
+                  </label>
+                  <input type="text" value={appNumber} onChange={(e) => setAppNumber(e.target.value)} placeholder="EDU/APP/2026/00000" className="border border-black/15 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#1E3A8A] transition-colors"/>
+                </div>
+                <div className="flex flex-col gap-2 text-left">
+                  <label className="font-mono text-xs tracking-wide uppercase text-black/50">
+                    Password
+                  </label>
+                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="border border-black/15 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#1E3A8A] transition-colors"/>
+                </div>
+                <button className="bg-[#14263F] text-white text-sm font-semibold py-3 rounded-xl hover:-translate-y-0.5 hover:shadow-md transition-all duration-300">
+                  Continue Application
+                </button>
+                <button onClick={() => setShowContinue(false)} className="text-xs text-black/40 hover:text-black/60 transition-colors">Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
