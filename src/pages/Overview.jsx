@@ -1,59 +1,148 @@
-// import React from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Users, ClipboardList, GraduationCap, Wallet, ArrowRight, Activity } from "lucide-react";
 import { PageHeader, Card, SectionCard, StatCard, Badge } from "../components/ui.jsx";
-import { platformStats, systemHealth, activityLogs, academicSessions } from "../data/mockData.js";
+import { systemHealth, activityLogs } from "../data/mockData.js";
+import { getAdminDashboardSummary, getAdminApplications, getAcademicSessions, getApplicationWindow, } from "../lib/api";
 
 function formatNaira(n) {
   return `₦${n.toLocaleString("en-NG")}`;
 }
 
 export default function Overview() {
-  const activeSession = academicSessions.find((s) => s.status === "Active");
-  const incidents = systemHealth.filter((s) => s.status !== "operational");
+ const {
+  data: summary,
+  isLoading: summaryLoading,
+} = useQuery({
+  queryKey: ["admin-dashboard-summary"],
+  queryFn: async () => {
+    const response = await getAdminDashboardSummary();
+    return response?.data ?? response ?? null;
+  },
+  staleTime: 0,
+});
+const {
+  data: submittedApplications = [],
+  isLoading: applicationsLoading,
+} = useQuery({
+  queryKey: ["admin-applications", "submitted-pipeline"],
+  queryFn: async () => {
+    const response = await getAdminApplications();
+
+    const applications = response?.data ?? response ?? [];
+
+    return Array.isArray(applications)
+      ? applications.filter(
+          (application) => application.status !== "DRAFT"
+        )
+      : [];
+  },
+  staleTime: 0,
+}); 
+const applicantCount = new Set(
+  submittedApplications
+    .map((application) => application.email)
+    .filter(Boolean)
+).size;
+const {
+  data: activeSession,
+  isLoading: sessionLoading,
+} = useQuery({
+  queryKey: ["academic-sessions"],
+  queryFn: async () => {
+    const response = await getAcademicSessions();
+    const sessions = response?.data ?? response ?? [];
+
+    return sessions.find((session) => session.is_current) ?? null;
+  },
+  staleTime: 0,
+});
+
+const {
+  data: applicationWindow,
+  isLoading: windowLoading,
+} = useQuery({
+  queryKey: ["application-window", activeSession?.id],
+  queryFn: async () => {
+    const response = await getApplicationWindow(activeSession.id);
+    return response?.data ?? response ?? null;
+  },
+  enabled: !!activeSession?.id,
+  staleTime: 0,
+});
+
+const loading =
+  summaryLoading ||
+  applicationsLoading ||
+  sessionLoading ||
+  windowLoading;
+
+const incidents = systemHealth.filter((s) => s.status !== "operational");
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Platform overview"
-        title="Good morning, Superadmin"
-        description="A live snapshot of the EduNova platform — applicants, admissions, revenue, and system status in one place."
-      />
-
-      {/* Stat grid */}
+      <PageHeader eyebrow="Platform overview" title="Good morning, Superadmin" description="A live snapshot of the EduNova platform — applicants, admissions, revenue, and system status in one place."/>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Applicants" value={platformStats.applicants.toLocaleString()} change="+4.6%" icon={Users} />
-        <StatCard label="Applications" value={platformStats.applications.toLocaleString()} change="+8.2%" icon={ClipboardList} />
-        <StatCard label="Admissions offered" value={platformStats.admissionsOffered.toLocaleString()} change="+1.1%" icon={GraduationCap} />
-        <StatCard label="Revenue collected" value={formatNaira(platformStats.revenue)} change="+3.4%" icon={Wallet} />
+        <StatCard
+  label="Applicants"
+  value={applicantCount.toLocaleString()}
+  icon={Users}
+/>
+
+<StatCard
+  label="Applications"
+  value={submittedApplications.length.toLocaleString()}
+  icon={ClipboardList}
+/>
+<StatCard
+  label="Awaiting review"
+  value={summary?.applications?.awaiting_review?.toLocaleString() ?? "0"}
+  icon={GraduationCap}
+/>
+
+<StatCard
+  label="Documents needing review"
+  value={ summary?.documents?.by_review_status?.NOT_REVIEWED?.toLocaleString() ?? "0"
+  }
+  icon={Wallet}
+/>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.9fr] gap-6 mt-6">
-        {/* Active session hero */}
         <div className="rounded-[24px] overflow-hidden relative bg-gradient-to-br from-navy-950 via-navy-800 to-navy-700">
           <svg className="absolute -right-8 -top-8 opacity-[0.12]" width="220" height="220" viewBox="0 0 220 220" fill="none">
             <circle cx="110" cy="110" r="108" stroke="#B8901F" strokeWidth="1" />
             <circle cx="110" cy="110" r="86" stroke="#B8901F" strokeWidth="1" />
             <circle cx="110" cy="110" r="64" stroke="#B8901F" strokeWidth="1" />
           </svg>
-          <div className="relative p-7 md:p-8 text-white h-full flex flex-col justify-between">
+          <div className="relative p-7 md:p-8 text-white h-full flex flex-col ">
             <div>
               <p className="text-xs text-white/50">Active academic session</p>
-              <h2 className="font-serif font-semibold text-[1.7rem] mt-2">{activeSession?.label}</h2>
+              <h2 className="font-serif font-semibold text-[1.7rem] mt-2">{activeSession?.name ?? "No current session"}</h2>
               <div className="flex items-center gap-2 mt-3">
-                <Badge tone="good">Applications {activeSession?.applicationStatus}</Badge>
+                <Badge tone={applicationWindow?.is_open ? "good" : "neutral"}>
+  Applications {applicationWindow?.is_open ? "OPEN" : "CLOSED"}
+</Badge>
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-4 mt-8 pt-6 border-t border-white/10">
+<div>
+  <p className="text-[11px] text-white/40">Opened</p>
+  <p className="text-sm mt-1">
+    {applicationWindow?.application_start_date
+      ? new Date(applicationWindow.application_start_date).toLocaleString()
+      : "Not configured"}
+  </p>
+</div>
               <div>
-                <p className="text-[11px] text-white/40">Opened</p>
-                <p className="text-sm mt-1">{activeSession?.start}</p>
-              </div>
-              <div>
-                <p className="text-[11px] text-white/40">Deadline</p>
-                <p className="text-sm mt-1">{activeSession?.deadline}</p>
-              </div>
+  <p className="text-[11px] text-white/40">Deadline</p>
+  <p className="text-sm mt-1">
+    {applicationWindow?.application_end_date
+      ? new Date(applicationWindow.application_end_date).toLocaleString()
+      : "Not configured"}
+  </p>
+</div>
               <div>
                 <p className="text-[11px] text-white/40">Application fee</p>
                 <p className="text-sm mt-1">{activeSession?.fee}</p>

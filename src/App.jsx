@@ -1,21 +1,23 @@
 // import React from "react";
 import { Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout.jsx"
-
+import Login from "./pages/Login.jsx";
 import Overview from "./pages/Overview.jsx";
 import Applicants from "./pages/Applicants.jsx";
 import Applications from "./pages/Applications.jsx";
+import ApplicationDetails from "./pages/ApplicationDetails.jsx";
 import Documents from "./pages/Documents.jsx";
 import Payments from "./pages/Payments.jsx";
 import Admissions from "./pages/Admissions.jsx";
 import Notifications from "./pages/Notifications.jsx";
 import Reports from "./pages/Reports.jsx";
 import Settings from "./pages/Settings.jsx";
+import PaymentDetails from "./pages/PaymentDetails.jsx";
 
 import Admins from "./pages/administration/Admins.jsx";
 import RolesPermissions from "./pages/administration/RolesPermissions.jsx";
 import ActivityLogs from "./pages/administration/ActivityLogs.jsx";
-
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Faculties from "./pages/system/Faculties.jsx";
 import Departments from "./pages/system/Departments.jsx";
 import Programmes from "./pages/system/Programmes.jsx";
@@ -31,12 +33,16 @@ import SecurityEvents from "./pages/security/SecurityEvents.jsx";
 export default function App() {
   return (
     <Routes>
-      <Route element={<Layout />}>
+      <Route path="/login" element={<Login />} />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<Layout />}>
         <Route path="/" element={<Overview />} />
         <Route path="/applicants" element={<Applicants />} />
         <Route path="/applications" element={<Applications />} />
+        <Route path="/applications/:applicationId" element={<ApplicationDetails />}/>
         <Route path="/documents" element={<Documents />} />
         <Route path="/payments" element={<Payments />} />
+        <Route path="/payments/:paymentId" element={<PaymentDetails />}/>
         <Route path="/admissions" element={<Admissions />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/reports" element={<Reports />} />
@@ -59,6 +65,7 @@ export default function App() {
         <Route path="/security/security-events" element={<SecurityEvents />} />
 
         <Route path="*" element={<Overview />} />
+      </Route>
       </Route>
     </Routes>
   );

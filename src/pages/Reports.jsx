@@ -1,18 +1,38 @@
-// import React from "react";
+import { useEffect, useState } from "react";
+import { getAdminAdmissionsSummary } from "../lib/api";
 import { PageHeader, SectionCard, Card } from "../components/ui.jsx";
 import { reportsSummary } from "../data/mockData.js";
 import { Download } from "lucide-react";
 import { Button } from "../components/ui.jsx";
 
-const PROGRAMME_BREAKDOWN = [
-  { programme: "B.Sc. Computer Science", applications: 2840, share: 18 },
-  { programme: "B.Eng. Electrical Engineering", applications: 2210, share: 14 },
-  { programme: "LL.B. Law", applications: 1980, share: 12 },
-  { programme: "B.Sc. Software Engineering", applications: 1740, share: 11 },
-  { programme: "B.Sc. Physics", applications: 990, share: 6 },
-];
+
 
 export default function Reports() {
+  const [programmeBreakdown, setProgrammeBreakdown] = useState([]);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState("");
+
+useEffect(() => {
+  async function loadProgrammeBreakdown() {
+    try {
+      const response = await getAdminAdmissionsSummary();
+      const data = response?.data ?? response ?? [];
+
+      setProgrammeBreakdown(
+        Array.isArray(data)
+          ? data
+          : data.items ?? []
+      );
+    } catch (error) {
+      console.error("Failed to load programme breakdown:", error);
+      setError(error.message || "Failed to load programme breakdown.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  loadProgrammeBreakdown();
+}, []);
   return (
     <div>
       <PageHeader
@@ -38,17 +58,40 @@ export default function Reports() {
 
       <SectionCard title="Applications by programme" description="Share of total applications this session, by programme.">
         <div className="flex flex-col gap-4">
-          {PROGRAMME_BREAKDOWN.map((p) => (
-            <div key={p.programme}>
-              <div className="flex items-center justify-between text-sm mb-1.5">
-                <span className="text-black">{p.programme}</span>
-                <span className="text-black/40">{p.applications.toLocaleString()}</span>
-              </div>
-              <div className="h-1.5 rounded-full bg-black/[0.06] overflow-hidden">
-                <div className="h-full rounded-full bg-navy-800" style={{ width: `${p.share * 5}%` }} />
-              </div>
-            </div>
-          ))}
+          {loading && (
+  <p className="text-sm text-black/40">Loading programme data...</p>
+)}
+
+{error && (
+  <p className="text-sm text-red-600">{error}</p>
+)}
+          {programmeBreakdown.map((p) => (
+  <div key={p.programme_id}>
+    <div className="flex items-center justify-between text-sm mb-1.5">
+      <span className="text-black">{p.programme}</span>
+      <span className="text-black/40">
+        {p.total_applications?.toLocaleString() ?? "0"}
+      </span>
+    </div>
+
+    <div className="h-1.5 rounded-full bg-black/[0.06] overflow-hidden">
+      <div
+        className="h-full rounded-full bg-navy-800"
+        style={{
+          width: `${
+            p.total_applications
+              ? Math.min((p.total_applications / Math.max(
+                  ...programmeBreakdown.map(
+                    (item) => item.total_applications ?? 0
+                  )
+                )) * 100, 100)
+              : 0
+          }%`,
+        }}
+      />
+    </div>
+  </div>
+))}
         </div>
       </SectionCard>
     </div>
