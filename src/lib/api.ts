@@ -412,3 +412,100 @@ export const activateSemester = (semesterId: string) =>
   apiFetch(`/superadmin/semesters/${semesterId}/activate`, {
     method: "PATCH",
   });
+
+// const COURSE_POLICIES_URL =
+//   "/api/v1/superadmin/course-registration-policies";
+
+export interface CourseRegistrationPolicyPayload {
+  academic_session_id: string;
+  department_id: string;
+  semester_id: string;
+  level: number;
+  minimum_units: number;
+  maximum_units: number;
+}
+export interface CourseRegistrationPolicy {
+  id: string;
+  academic_session_id: string;
+  department_id: string;
+  semester_id: string;
+  level: number;
+  minimum_units: number;
+  maximum_units: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const getCourseRegistrationPolicies = () =>
+  apiFetch("/superadmin/course-registration-policies", {
+    method: "GET",
+  });
+
+export const getCourseRegistrationPolicy = (policyId: string) =>
+  apiFetch(`/superadmin/course-registration-policies/${policyId}`, {
+    method: "GET",
+  });
+
+export const createCourseRegistrationPolicy = (
+  payload: CourseRegistrationPolicyPayload
+) =>
+  apiFetch("/superadmin/course-registration-policies", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const updateCourseRegistrationPolicy = (
+  policyId: string,
+  payload: Partial<CourseRegistrationPolicyPayload>
+) =>
+  apiFetch(`/superadmin/course-registration-policies/${policyId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const activateCourseRegistrationPolicy = (policyId: string) =>
+  apiFetch(
+    `/superadmin/course-registration-policies/${policyId}/activate`,
+    {
+      method: "PATCH",
+    }
+  );
+  export interface AdminCoursePayload {
+  code: string;
+  title: string;
+  credit_units: number;
+  level: number;
+  semester: number;
+  programme_id: string;
+}
+
+export interface AdminCourse extends AdminCoursePayload {
+  id: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const getAdminCourses = () =>
+  apiFetch("/superadmin/courses/");
+
+export const createAdminCourse = (payload: AdminCoursePayload) =>
+  apiFetch("/superadmin/courses/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  export const updateAdminCourse = (
+  courseId: string,
+  payload: {
+    code: string;
+    title: string;
+    credit_units: number;
+    level: number;
+    semester: number;
+    programme_id: string;
+  }
+) =>
+  apiFetch(`/superadmin/courses/${courseId}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });

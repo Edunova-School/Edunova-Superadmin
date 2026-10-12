@@ -53,6 +53,8 @@ const NAV = [
       { to: "/system/faculties", label: "Faculties", icon: Landmark },
       { to: "/system/departments", label: "Departments", icon: Building2 },
       { to: "/system/programmes", label: "Programmes", icon: BookOpen },
+      { to: "/system/course-policy", label: "Course Policy", icon: BookOpen },
+      { to: "/system/course-catalogue", label: "Course Catalogue", icon: BookOpen },
       { to: "/system/academic-sessions", label: "Academic Sessions", icon: CalendarRange },
       { to: "/system/application-settings", label: "Application Settings", icon: SlidersHorizontal },
       { to: "/system/payment-settings", label: "Payment Settings", icon: CreditCard },

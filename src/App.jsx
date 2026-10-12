@@ -21,6 +21,8 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Faculties from "./pages/system/Faculties.jsx";
 import Departments from "./pages/system/Departments.jsx";
 import Programmes from "./pages/system/Programmes.jsx";
+import CoursePolicy from "./pages/system/CoursePolicy.jsx";
+import CourseCatalogue from "./pages/system/CourseCatalogue.jsx";
 import AcademicSessions from "./pages/system/AcademicSessions.jsx";
 import ApplicationSettings from "./pages/system/ApplicationSettings.jsx";
 import PaymentSettings from "./pages/system/PaymentSettings.jsx";
@@ -36,36 +38,39 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
-        <Route path="/" element={<Overview />} />
-        <Route path="/applicants" element={<Applicants />} />
-        <Route path="/applications" element={<Applications />} />
-        <Route path="/applications/:applicationId" element={<ApplicationDetails />}/>
-        <Route path="/documents" element={<Documents />} />
-        <Route path="/payments" element={<Payments />} />
-        <Route path="/payments/:paymentId" element={<PaymentDetails />}/>
-        <Route path="/admissions" element={<Admissions />} />
-        <Route path="/notifications" element={<Notifications />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/settings" element={<Settings />} />
+          <Route path="/" element={<Overview />} />
+          <Route path="/applicants" element={<Applicants />} />
+          <Route path="/applications" element={<Applications />} />
+          <Route path="/applications/:applicationId" element={<ApplicationDetails />} />
+          <Route path="/documents" element={<Documents />} />
+          <Route path="/payments" element={<Payments />} />
+          <Route path="/payments/:paymentId" element={<PaymentDetails />} />
+          <Route path="/admissions" element={<Admissions />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/settings" element={<Settings />} />
 
-        <Route path="/administration/admins" element={<Admins />} />
-        <Route path="/administration/roles" element={<RolesPermissions />} />
-        <Route path="/administration/activity-logs" element={<ActivityLogs />} />
+          <Route path="/administration/admins" element={<Admins />} />
+          <Route path="/administration/roles" element={<RolesPermissions />} />
+          <Route path="/administration/activity-logs" element={<ActivityLogs />} />
 
-        <Route path="/system/faculties" element={<Faculties />} />
-        <Route path="/system/departments" element={<Departments />} />
-        <Route path="/system/programmes" element={<Programmes />} />
-        <Route path="/system/academic-sessions" element={<AcademicSessions />} />
-        <Route path="/system/application-settings" element={<ApplicationSettings />} />
-        <Route path="/system/payment-settings" element={<PaymentSettings />} />
-        <Route path="/system/notification-settings" element={<NotificationSettings />} />
+          <Route path="/system/faculties" element={<Faculties />} />
+          <Route path="/system/departments" element={<Departments />} />
+          <Route path="/system/programmes" element={<Programmes />} />
+          <Route path="/system/course-policy" element={<CoursePolicy />}></Route>
+          <Route path="/system/course-catalogue" element={<CourseCatalogue />}></Route>
 
-        <Route path="/security/audit-logs" element={<AuditLogs />} />
-        <Route path="/security/login-sessions" element={<LoginSessions />} />
-        <Route path="/security/security-events" element={<SecurityEvents />} />
+          <Route path="/system/academic-sessions" element={<AcademicSessions />} />
+          <Route path="/system/application-settings" element={<ApplicationSettings />} />
+          <Route path="/system/payment-settings" element={<PaymentSettings />} />
+          <Route path="/system/notification-settings" element={<NotificationSettings />} />
 
-        <Route path="*" element={<Overview />} />
-      </Route>
+          <Route path="/security/audit-logs" element={<AuditLogs />} />
+          <Route path="/security/login-sessions" element={<LoginSessions />} />
+          <Route path="/security/security-events" element={<SecurityEvents />} />
+
+          <Route path="*" element={<Overview />} />
+        </Route>
       </Route>
     </Routes>
   );
