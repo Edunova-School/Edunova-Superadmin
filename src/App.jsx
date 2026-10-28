@@ -25,12 +25,14 @@ import CoursePolicy from "./pages/system/CoursePolicy.jsx";
 import CourseCatalogue from "./pages/system/CourseCatalogue.jsx";
 import AcademicSessions from "./pages/system/AcademicSessions.jsx";
 import ApplicationSettings from "./pages/system/ApplicationSettings.jsx";
+import SuperAdminProgramChanges from "./pages/system/SuperAdminProgramChanges.jsx";
 import PaymentSettings from "./pages/system/PaymentSettings.jsx";
 import NotificationSettings from "./pages/system/NotificationSettings.jsx";
 
 import AuditLogs from "./pages/security/AuditLogs.jsx";
 import LoginSessions from "./pages/security/LoginSessions.jsx";
 import SecurityEvents from "./pages/security/SecurityEvents.jsx";
+import AccountManagement from "./pages/security/AccountManagement.jsx";
 
 export default function App() {
   return (
@@ -53,11 +55,13 @@ export default function App() {
           <Route path="/administration/admins" element={<Admins />} />
           <Route path="/administration/roles" element={<RolesPermissions />} />
           <Route path="/administration/activity-logs" element={<ActivityLogs />} />
+          
 
           <Route path="/system/faculties" element={<Faculties />} />
           <Route path="/system/departments" element={<Departments />} />
           <Route path="/system/programmes" element={<Programmes />} />
           <Route path="/system/course-policy" element={<CoursePolicy />}></Route>
+          <Route path="/system/program-changes" element={<SuperAdminProgramChanges />}></Route>
           <Route path="/system/course-catalogue" element={<CourseCatalogue />}></Route>
 
           <Route path="/system/academic-sessions" element={<AcademicSessions />} />
@@ -68,6 +72,7 @@ export default function App() {
           <Route path="/security/audit-logs" element={<AuditLogs />} />
           <Route path="/security/login-sessions" element={<LoginSessions />} />
           <Route path="/security/security-events" element={<SecurityEvents />} />
+          <Route path="/security/account-management" element={<AccountManagement/>}></Route>
 
           <Route path="*" element={<Overview />} />
         </Route>

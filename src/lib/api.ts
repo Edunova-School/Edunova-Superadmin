@@ -7,7 +7,7 @@ export const setToken = (token: string) => localStorage.setItem(TOKEN_KEY, token
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY)
 
 interface ApiOptions extends RequestInit {
-  auth?: boolean // attach Bearer token — default true
+  auth?: boolean 
 }
 
 async function apiFetch(path: string, options: ApiOptions = {}) {
@@ -508,4 +508,74 @@ export const createAdminCourse = (payload: AdminCoursePayload) =>
   apiFetch(`/superadmin/courses/${courseId}/`, {
     method: "PATCH",
     body: JSON.stringify(payload),
+  });
+  export const overrideProgrammeChangeRequest = (
+  requestId: string | number,
+  targetStage: string,
+  decision: string,
+  comments: string
+) =>
+  apiFetch(`/superadmin/programme-changes/${requestId}/override`, {
+    method: "POST",
+    body: JSON.stringify({
+      target_stage: targetStage,
+      decision,
+      comments,
+    }),
+  });
+  // ---- Super Admin: Account Management ----
+
+export interface SuperAdminUsersParams {
+  role?: string;
+  is_active?: boolean;
+}
+
+export const getSuperAdminUsers = (
+  params?: SuperAdminUsersParams
+) => {
+  const query = new URLSearchParams();
+
+  if (params?.role) {
+    query.set("role", params.role);
+  }
+
+  if (params?.is_active !== undefined) {
+    query.set("is_active", String(params.is_active));
+  }
+
+  const queryString = query.toString();
+
+  return apiFetch(
+    `/superadmin/users${queryString ? `?${queryString}` : ""}`,
+    {
+      method: "GET",
+    }
+  );
+};
+
+export const assignSuperAdminUserRole = (
+  userId: string,
+  role: string
+) =>
+  apiFetch(`/superadmin/users/${userId}/roles`, {
+    method: "POST",
+    body: JSON.stringify({
+      role,
+    }),
+  });
+  export const removeSuperAdminUserRole = (
+  userId: string,
+  roleId: string
+) =>
+  apiFetch(`/superadmin/users/${userId}/roles/${roleId}`, {
+    method: "DELETE",
+  });
+  export const deactivateSuperAdminUser = (userId: string) =>
+  apiFetch(`/superadmin/users/${userId}/deactivate`, {
+    method: "PATCH",
+  });
+
+export const activateSuperAdminUser = (userId: string) =>
+  apiFetch(`/superadmin/users/${userId}/activate`, {
+    method: "PATCH",
   });

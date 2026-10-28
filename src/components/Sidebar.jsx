@@ -57,6 +57,7 @@ const NAV = [
       { to: "/system/course-catalogue", label: "Course Catalogue", icon: BookOpen },
       { to: "/system/academic-sessions", label: "Academic Sessions", icon: CalendarRange },
       { to: "/system/application-settings", label: "Application Settings", icon: SlidersHorizontal },
+      { to: "/system/program-changes", label: "Program Change Request", icon: MessageSquareText },
       { to: "/system/payment-settings", label: "Payment Settings", icon: CreditCard },
       { to: "/system/notification-settings", label: "Notification Settings", icon: MessageSquareText },
     ],
@@ -64,9 +65,11 @@ const NAV = [
   {
     section: "Security",
     items: [
+      { to: "/security/account-management", label: "Account Management", icon: Siren },
       { to: "/security/audit-logs", label: "Audit Logs", icon: FileClock },
       { to: "/security/login-sessions", label: "Login Sessions", icon: Monitor },
       { to: "/security/security-events", label: "Security Events", icon: Siren },
+
     ],
   },
 ];
